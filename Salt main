@@ -1,0 +1,290 @@
+-- Salt Personal Cheat Menu (Roblox Luau)
+-- Только для личного использования
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+local Workspace = game:GetService("Workspace")
+
+local player = Players.LocalPlayer
+local mouse = player:GetMouse()
+
+-- Настройки
+local Settings = {
+    Fly = false,
+    FlySpeed = 100,
+    Noclip = false,
+    Speed = 16,
+    InfiniteJump = false,
+    ESP = false
+}
+
+-- Создаём ScreenGui
+local sg = Instance.new("ScreenGui")
+sg.Name = "SaltGUI"
+sg.ResetOnSpawn = false
+sg.Parent = game:GetService("CoreGui")  -- или player.PlayerGui, если не работает
+
+-- Главный фрейм (слева сверху)
+local mainFrame = Instance.new("Frame")
+mainFrame.Size = UDim2.new(0, 220, 0, 380)
+mainFrame.Position = UDim2.new(0, 15, 0, 15)
+mainFrame.BackgroundColor3 = Color3.fromRGB(18, 18, 18)
+mainFrame.BorderSizePixel = 0
+mainFrame.Parent = sg
+
+local corner = Instance.new("UICorner")
+corner.CornerRadius = UDim.new(0, 8)
+corner.Parent = mainFrame
+
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, 0, 0, 40)
+title.BackgroundTransparency = 1
+title.Text = "Salt"
+title.TextColor3 = Color3.fromRGB(220, 220, 220)
+title.TextSize = 28
+title.Font = Enum.Font.GothamBold
+title.TextXAlignment = Enum.TextXAlignment.Center
+title.Parent = mainFrame
+
+-- Фон с плывущими точками
+local particles = {}
+
+local function createParticle()
+    local part = Instance.new("Frame")
+    part.Size = UDim2.new(0, 3, 0, 3)
+    part.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    part.BackgroundTransparency = 0.4
+    part.BorderSizePixel = 0
+    part.ZIndex = 0
+    part.Parent = mainFrame
+    
+    local uiCorner = Instance.new("UICorner")
+    uiCorner.CornerRadius = UDim.new(1, 0)
+    uiCorner.Parent = part
+    
+    return part
+end
+
+-- Создаём 60 частиц
+for i = 1, 60 do
+    local p = createParticle()
+    p.Position = UDim2.new(
+        math.random(),
+        math.random(-20, 20),
+        math.random(),
+        math.random(-20, 20)
+    )
+    table.insert(particles, p)
+end
+
+-- Анимация частиц (плавное движение + мерцание)
+RunService.Heartbeat:Connect(function(delta)
+    for _, p in ipairs(particles) do
+        local currentPos = p.Position
+        local x = currentPos.X.Scale + math.sin(tick() * 0.4 + p.Position.X.Offset) * 0.0008
+        local y = currentPos.Y.Scale + math.cos(tick() * 0.5 + p.Position.Y.Offset) * 0.0007
+        
+        -- Ограничение по границам фрейма
+        if x < 0 or x > 1 then x = math.clamp(x, 0, 1) end
+        if y < 0 or y > 1 then y = math.clamp(y, 0, 1) end
+        
+        local tweenInfo = TweenInfo.new(0.8, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
+        TweenService:Create(p, tweenInfo, {
+            Position = UDim2.new(x, 0, y, 0),
+            BackgroundTransparency = 0.3 + math.sin(tick() * 3 + i) * 0.3
+        }):Play()
+    end
+end)
+
+-- Переключатели и слайдеры (простой стиль)
+local yOffset = 50
+
+local function createToggle(name, callback)
+    local toggleFrame = Instance.new("Frame")
+    toggleFrame.Size = UDim2.new(1, -20, 0, 30)
+    toggleFrame.Position = UDim2.new(0, 10, 0, yOffset)
+    toggleFrame.BackgroundTransparency = 1
+    toggleFrame.Parent = mainFrame
+    
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(0.7, 0, 1, 0)
+    label.BackgroundTransparency = 1
+    label.Text = name
+    label.TextColor3 = Color3.fromRGB(200, 200, 200)
+    label.TextSize = 16
+    label.Font = Enum.Font.Gotham
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Parent = toggleFrame
+    
+    local button = Instance.new("TextButton")
+    button.Size = UDim2.new(0, 40, 0, 20)
+    button.Position = UDim2.new(1, -50, 0, 5)
+    button.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+    button.Text = "OFF"
+    button.TextColor3 = Color3.fromRGB(150, 150, 150)
+    button.Font = Enum.Font.Gotham
+    button.TextSize = 14
+    button.Parent = toggleFrame
+    
+    local btnCorner = Instance.new("UICorner")
+    btnCorner.CornerRadius = UDim.new(0, 6)
+    btnCorner.Parent = button
+    
+    local enabled = false
+    
+    button.MouseButton1Click:Connect(function()
+        enabled = not enabled
+        button.Text = enabled and "ON" or "OFF"
+        button.BackgroundColor3 = enabled and Color3.fromRGB(0, 170, 100) or Color3.fromRGB(60, 60, 60)
+        callback(enabled)
+    end)
+    
+    yOffset = yOffset + 40
+    return toggleFrame
+end
+
+local function createSlider(name, min, max, default, callback)
+    local sliderFrame = Instance.new("Frame")
+    sliderFrame.Size = UDim2.new(1, -20, 0, 50)
+    sliderFrame.Position = UDim2.new(0, 10, 0, yOffset)
+    sliderFrame.BackgroundTransparency = 1
+    sliderFrame.Parent = mainFrame
+    
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1, 0, 0, 20)
+    label.BackgroundTransparency = 1
+    label.Text = name .. ": " .. default
+    label.TextColor3 = Color3.fromRGB(200, 200, 200)
+    label.TextSize = 15
+    label.Font = Enum.Font.Gotham
+    label.Parent = sliderFrame
+    
+    local bar = Instance.new("Frame")
+    bar.Size = UDim2.new(1, 0, 0, 8)
+    bar.Position = UDim2.new(0, 0, 0, 30)
+    bar.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    bar.Parent = sliderFrame
+    
+    local fill = Instance.new("Frame")
+    fill.Size = UDim2.new(default / max, 0, 1, 0)
+    fill.BackgroundColor3 = Color3.fromRGB(100, 180, 255)
+    fill.Parent = bar
+    
+    local knob = Instance.new("Frame")
+    knob.Size = UDim2.new(0, 16, 0, 16)
+    knob.Position = UDim2.new(default / max, -8, 0.5, -8)
+    knob.BackgroundColor3 = Color3.fromRGB(180, 220, 255)
+    knob.Parent = bar
+    
+    local knobCorner = Instance.new("UICorner")
+    knobCorner.CornerRadius = UDim.new(1, 0)
+    knobCorner.Parent = knob
+    
+    local dragging = false
+    
+    knob.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = true
+        end
+    end)
+    
+    knob.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = false
+        end
+    end)
+    
+    RunService.RenderStepped:Connect(function()
+        if dragging then
+            local mousePos = UserInputService:GetMouseLocation()
+            local relativeX = math.clamp((mousePos.X - bar.AbsolutePosition.X) / bar.AbsoluteSize.X, 0, 1)
+            knob.Position = UDim2.new(relativeX, -8, 0.5, -8)
+            fill.Size = UDim2.new(relativeX, 0, 1, 0)
+            local value = math.floor(min + (max - min) * relativeX)
+            label.Text = name .. ": " .. value
+            callback(value)
+        end
+    end)
+    
+    yOffset = yOffset + 60
+end
+
+-- Функции
+local flyBody = nil
+local noclipConn = nil
+
+local function toggleFly(enabled)
+    Settings.Fly = enabled
+    local char = player.Character
+    if not char or not char:FindFirstChild("HumanoidRootPart") then return end
+    
+    local root = char.HumanoidRootPart
+    
+    if enabled then
+        flyBody = Instance.new("BodyVelocity")
+        flyBody.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+        flyBody.Velocity = Vector3.new()
+        flyBody.Parent = root
+    else
+        if flyBody then flyBody:Destroy() flyBody = nil end
+    end
+end
+
+RunService.RenderStepped:Connect(function()
+    if Settings.Fly and flyBody then
+        local moveDir = Vector3.new(0,0,0)
+        if UserInputService:IsKeyDown(Enum.KeyCode.W) then moveDir += workspace.CurrentCamera.CFrame.LookVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.S) then moveDir -= workspace.CurrentCamera.CFrame.LookVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.A) then moveDir -= workspace.CurrentCamera.CFrame.RightVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.D) then moveDir += workspace.CurrentCamera.CFrame.RightVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.Space) then moveDir += Vector3.new(0,1,0) end
+        if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then moveDir -= Vector3.new(0,1,0) end
+        
+        flyBody.Velocity = moveDir.Unit * Settings.FlySpeed * 10
+    end
+end)
+
+local function toggleNoclip(enabled)
+    Settings.Noclip = enabled
+    if enabled then
+        noclipConn = RunService.Stepped:Connect(function()
+            if player.Character then
+                for _, part in ipairs(player.Character:GetDescendants()) do
+                    if part:IsA("BasePart") then
+                        part.CanCollide = false
+                    end
+                end
+            end
+        end)
+    else
+        if noclipConn then noclipConn:Disconnect() noclipConn = nil end
+    end
+end
+
+-- Добавляем элементы в меню
+createToggle("Fly", toggleFly)
+createToggle("Noclip", toggleNoclip)
+createToggle("Infinite Jump", function(v) Settings.InfiniteJump = v end)
+createToggle("ESP (soon)", function(v) Settings.ESP = v end)  -- можно потом доработать
+
+createSlider("Walk Speed", 16, 200, 16, function(v)
+    Settings.Speed = v
+    if player.Character and player.Character:FindFirstChild("Humanoid") then
+        player.Character.Humanoid.WalkSpeed = v
+    end
+end)
+
+createSlider("Fly Speed", 50, 400, 100, function(v)
+    Settings.FlySpeed = v
+end)
+
+-- Бесконечный прыжок
+UserInputService.JumpRequest:Connect(function()
+    if Settings.InfiniteJump and player.Character then
+        player.Character:FindFirstChildOfClass("Humanoid"):ChangeState("Jumping")
+    end
+end)
+
+print("Salt меню загружено!")
