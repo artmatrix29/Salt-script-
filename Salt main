@@ -1,5 +1,5 @@
--- Salt v5 — меню (исправления): корректные Drawing-ESP, bind для аима (по-умолчанию RMB), скролл-меню, плавные частицы
--- Запуск: LocalScript в StarterPlayerScripts / PlayerScripts. Тестировать в Studio (Play Solo).
+-- Salt V5 — полная переработка меню + ESP/Aimbot/FOV
+-- LocalScript (StarterPlayerScripts/PlayerScripts). Тестировать в Roblox Studio (Play Solo).
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -9,146 +9,158 @@ local Workspace = game:GetService("Workspace")
 local player = Players.LocalPlayer
 local camera = Workspace.CurrentCamera
 
--- Настройки
+-- Настройки (меняются UI)
 local Settings = {
     Fly = false,
-    FlySpeed = 50,
+    FlySpeed = 60,
     Noclip = false,
     WalkSpeed = 16,
     InfiniteJump = false,
     ESP = false,
     Aimbot = false,
-    AimbotFOV = 120,     -- градусы
-    AimbotSmooth = 0.15, -- 0..1
+    AimbotFOV = 120,
+    AimbotSmooth = 0.15,
     TeamCheck = true,
-    AimbotHoldMode = true -- если true — удержание бинда; если false — toggle
+    AimbotHoldMode = true -- true = hold-to-aim, false = toggle
 }
 
--- Drawing-хранение
+-- Internal
 local drawings = { boxes = {}, names = {}, fov = nil }
-local espConnection, aimbotConnection, noclipConnection = nil, nil, nil
-local flyBodyVelocity = nil
-local aimBind = { InputType = Enum.UserInputType.MouseButton2, KeyCode = nil } -- по-умолчанию RMB
+local espConn, aimbotConn, noclipConn = nil, nil, nil
+local flyBV = nil
+local originalCameraType = nil
+
+-- Bind for aimbot: saved input type + keycode (if keyboard)
+local aimBind = { InputType = Enum.UserInputType.MouseButton2, KeyCode = nil } -- default: RMB
 local bindingMode = false
 
--- HUD (PlayerGui) + DisplayOrder + З-индекс
+-- GUI root in PlayerGui, high display order so it's over most things
 local playerGui = player:WaitForChild("PlayerGui")
-local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "SaltV5_UI"
-screenGui.ResetOnSpawn = false
-screenGui.IgnoreGuiInset = true
-screenGui.DisplayOrder = 9999
-screenGui.Parent = playerGui
+local rootGui = Instance.new("ScreenGui")
+rootGui.Name = "SaltV5_UI"
+rootGui.ResetOnSpawn = false
+rootGui.IgnoreGuiInset = true
+rootGui.DisplayOrder = 9999
+rootGui.Parent = playerGui
 
--- Main короткий фрейм + ScrollingFrame для опций
-local mainFrame = Instance.new("Frame")
-mainFrame.Name = "Main"
-mainFrame.Size = UDim2.new(0, 300, 0, 80) -- компактный, остальное через Scroll
-mainFrame.Position = UDim2.new(0, 16, 0, 16)
-mainFrame.BackgroundColor3 = Color3.fromRGB(20,20,20)
-mainFrame.BorderSizePixel = 0
-mainFrame.ZIndex = 50
-mainFrame.Parent = screenGui
-local mainCorner = Instance.new("UICorner", mainFrame); mainCorner.CornerRadius = UDim.new(0,10)
+-- MAIN FRAME (compact header + expandable scroll)
+local main = Instance.new("Frame")
+main.Name = "Main"
+main.Size = UDim2.new(0, 320, 0, 72) -- small by default
+main.Position = UDim2.new(0, 16, 0, 16)
+main.BackgroundColor3 = Color3.fromRGB(22,22,22)
+main.BorderSizePixel = 0
+main.ZIndex = 50
+main.Parent = rootGui
+local mainCorner = Instance.new("UICorner", main); mainCorner.CornerRadius = UDim.new(0,10)
 
--- Title bar (перетаскивание)
-local title = Instance.new("TextLabel")
-title.Size = UDim2.new(1, 0, 0, 32)
+local header = Instance.new("Frame", main)
+header.Size = UDim2.new(1,0,0,40)
+header.BackgroundTransparency = 1
+
+local title = Instance.new("TextLabel", header)
+title.Size = UDim2.new(1, -80, 1, 0)
+title.Position = UDim2.new(0, 12, 0, 0)
 title.BackgroundTransparency = 1
 title.Text = "Salt v5"
-title.TextColor3 = Color3.fromRGB(230,230,230)
 title.Font = Enum.Font.GothamBold
 title.TextSize = 18
+title.TextColor3 = Color3.fromRGB(240,240,240)
+title.TextXAlignment = Enum.TextXAlignment.Left
 title.ZIndex = 51
-title.Parent = mainFrame
 
--- Expand button
-local expandBtn = Instance.new("TextButton")
-expandBtn.Size = UDim2.new(0, 28, 0, 28)
-expandBtn.Position = UDim2.new(1, -34, 0, 4)
+local expandBtn = Instance.new("TextButton", header)
+expandBtn.Size = UDim2.new(0, 44, 0, 28)
+expandBtn.Position = UDim2.new(1, -56, 0, 6)
 expandBtn.Text = "+"
-expandBtn.Font = Enum.Font.SourceSansBold
-expandBtn.TextSize = 18
-expandBtn.BackgroundColor3 = Color3.fromRGB(45,45,45)
+expandBtn.Font = Enum.Font.GothamBold
+expandBtn.TextSize = 20
+expandBtn.BackgroundColor3 = Color3.fromRGB(40,40,40)
 expandBtn.TextColor3 = Color3.fromRGB(220,220,220)
 expandBtn.ZIndex = 51
-expandBtn.Parent = mainFrame
 Instance.new("UICorner", expandBtn).CornerRadius = UDim.new(0,6)
 
--- Scrolling content (изначально скрыт)
-local scroller = Instance.new("ScrollingFrame")
-scroller.Name = "Content"
-scroller.Size = UDim2.new(1, -12, 0, 360)
-scroller.Position = UDim2.new(0, 6, 0, 44)
-scroller.CanvasSize = UDim2.new(0, 0, 0, 0)
-scroller.ScrollBarThickness = 6
-scroller.BackgroundTransparency = 1
-scroller.VerticalScrollBarInset = Enum.ScrollBarInset.Always
-scroller.Visible = false
-scroller.ZIndex = 50
-scroller.Parent = mainFrame
+local dragHandle = header -- whole header draggable
 
-local uiList = Instance.new("UIListLayout", scroller)
-uiList.Padding = UDim.new(0,8)
-uiList.SortOrder = Enum.SortOrder.LayoutOrder
-uiList.HorizontalAlignment = Enum.HorizontalAlignment.Center
+-- Scroll area (hidden until expand)
+local scroll = Instance.new("ScrollingFrame", main)
+scroll.Name = "Scroll"
+scroll.Size = UDim2.new(1, -12, 0, 360)
+scroll.Position = UDim2.new(0, 6, 0, 80)
+scroll.BackgroundTransparency = 1
+scroll.CanvasSize = UDim2.new(0,0,0,0)
+scroll.ScrollBarThickness = 8
+scroll.Visible = false
+scroll.ZIndex = 50
 
--- helper: make small control frames
-local function makeControlFrame(height)
+local list = Instance.new("UIListLayout", scroll)
+list.Padding = UDim.new(0,8)
+list.SortOrder = Enum.SortOrder.LayoutOrder
+
+-- Minimal footer info
+local info = Instance.new("TextLabel", main)
+info.Size = UDim2.new(1, -12, 0, 20)
+info.Position = UDim2.new(0, 8, 1, -28)
+info.BackgroundTransparency = 1
+info.Text = "Hold: RMB (bindable)  •  Toggle: via UI"
+info.TextColor3 = Color3.fromRGB(180,180,180)
+info.Font = Enum.Font.Gotham
+info.TextSize = 12
+info.TextXAlignment = Enum.TextXAlignment.Left
+info.ZIndex = 51
+info.Visible = false
+
+-- layout helpers
+local function makeRow(height)
     local f = Instance.new("Frame")
-    f.Size = UDim2.new(1, -12, 0, height)
+    f.Size = UDim2.new(1, 0, 0, height)
     f.BackgroundTransparency = 1
-    f.Parent = scroller
+    f.Parent = scroll
     f.ZIndex = 50
     return f
 end
 
--- Toggle creator (syncs with Settings)
-local function createToggle(text, settingKey, callback)
-    local f = makeControlFrame(36)
+local function makeToggle(text, initial, callback)
+    local f = makeRow(36)
     local lbl = Instance.new("TextLabel", f)
     lbl.Size = UDim2.new(0.6, 0, 1, 0)
     lbl.BackgroundTransparency = 1
     lbl.Text = text
-    lbl.TextColor3 = Color3.fromRGB(220,220,220)
+    lbl.TextColor3 = Color3.fromRGB(230,230,230)
     lbl.Font = Enum.Font.Gotham
     lbl.TextSize = 14
     lbl.TextXAlignment = Enum.TextXAlignment.Left
 
     local btn = Instance.new("TextButton", f)
-    btn.Size = UDim2.new(0, 60, 0, 26)
-    btn.Position = UDim2.new(1, -70, 0, 5)
-    btn.BackgroundColor3 = Color3.fromRGB(60,60,60)
-    btn.TextColor3 = Color3.fromRGB(200,200,200)
+    btn.Size = UDim2.new(0, 74, 0, 26)
+    btn.Position = UDim2.new(1, -84, 0, 5)
+    btn.BackgroundColor3 = initial and Color3.fromRGB(0,170,100) or Color3.fromRGB(55,55,55)
+    btn.Text = initial and "ON" or "OFF"
     btn.Font = Enum.Font.GothamBold
     btn.TextSize = 14
-    btn.Text = Settings[settingKey] and "ON" or "OFF"
+    btn.TextColor3 = Color3.fromRGB(240,240,240)
     Instance.new("UICorner", btn).CornerRadius = UDim.new(0,6)
-    btn.ZIndex = 51
 
-    local state = Settings[settingKey]
+    local state = initial
     btn.MouseButton1Click:Connect(function()
         state = not state
-        Settings[settingKey] = state
         btn.Text = state and "ON" or "OFF"
-        btn.BackgroundColor3 = state and Color3.fromRGB(0,180,110) or Color3.fromRGB(60,60,60)
-        if callback then pcall(callback, state) end
+        btn.BackgroundColor3 = state and Color3.fromRGB(0,170,100) or Color3.fromRGB(55,55,55)
+        pcall(callback, state)
     end)
-    -- init colors
-    btn.BackgroundColor3 = state and Color3.fromRGB(0,180,110) or Color3.fromRGB(60,60,60)
-    return { frame = f, button = btn, label = lbl }
+    return { frame = f, label = lbl, button = btn, set = function(v) state = v; btn.Text = v and "ON" or "OFF"; btn.BackgroundColor3 = v and Color3.fromRGB(0,170,100) or Color3.fromRGB(55,55,55) end }
 end
 
--- Slider creator (simple integer slider)
-local function createSlider(text, min, max, default, onChange)
-    local f = makeControlFrame(56)
+local function makeSlider(text, min, max, default, onChange)
+    local f = makeRow(56)
     local lbl = Instance.new("TextLabel", f)
-    lbl.Size = UDim2.new(1,0,0,20)
+    lbl.Size = UDim2.new(1, 0, 0, 20)
     lbl.BackgroundTransparency = 1
-    lbl.Text = text .. ": " .. tostring(default)
-    lbl.TextColor3 = Color3.fromRGB(220,220,220)
+    lbl.Text = string.format("%s: %d", text, default)
     lbl.Font = Enum.Font.Gotham
+    lbl.TextColor3 = Color3.fromRGB(230,230,230)
     lbl.TextSize = 13
+    lbl.TextXAlignment = Enum.TextXAlignment.Left
 
     local barBg = Instance.new("Frame", f)
     barBg.Size = UDim2.new(1, 0, 0, 8)
@@ -160,144 +172,140 @@ local function createSlider(text, min, max, default, onChange)
     local rel = (default - min) / (max - min)
     local fill = Instance.new("Frame", barBg)
     fill.Size = UDim2.new(rel, 0, 1, 0)
-    fill.BackgroundColor3 = Color3.fromRGB(100,180,255)
+    fill.BackgroundColor3 = Color3.fromRGB(100,190,255)
     Instance.new("UICorner", fill).CornerRadius = UDim.new(1,4)
 
     local knob = Instance.new("TextButton", barBg)
-    knob.Size = UDim2.new(0, 18, 0, 18)
-    knob.Position = UDim2.new(rel, -9, 0.5, -9)
+    knob.Size = UDim2.new(0, 16, 0, 16)
+    knob.Position = UDim2.new(rel, -8, 0.5, -8)
     knob.Text = ""
-    knob.BackgroundColor3 = Color3.fromRGB(245,245,245)
-    Instance.new("UICorner", knob).CornerRadius = UDim.new(1,9)
-    knob.ZIndex = 52
+    knob.BackgroundColor3 = Color3.fromRGB(250,250,250)
+    Instance.new("UICorner", knob).CornerRadius = UDim.new(1,8)
 
     local dragging = false
-    knob.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = true end
+    knob.InputBegan:Connect(function(inp)
+        if inp.UserInputType == Enum.UserInputType.MouseButton1 then dragging = true end
     end)
-    UserInputService.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end
+    UserInputService.InputEnded:Connect(function(inp)
+        if inp.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end
     end)
     RunService.RenderStepped:Connect(function()
         if dragging and barBg.AbsoluteSize.X > 0 then
             local mx = UserInputService:GetMouseLocation().X
             local relX = math.clamp((mx - barBg.AbsolutePosition.X) / barBg.AbsoluteSize.X, 0, 1)
             fill.Size = UDim2.new(relX, 0, 1, 0)
-            knob.Position = UDim2.new(relX, -9, 0.5, -9)
+            knob.Position = UDim2.new(relX, -8, 0.5, -8)
             local val = math.floor(min + (max - min) * relX)
-            lbl.Text = text .. ": " .. tostring(val)
-            if onChange then pcall(onChange, val) end
+            lbl.Text = string.format("%s: %d", text, val)
+            pcall(onChange, val)
         end
     end)
     return { frame = f, label = lbl }
 end
 
--- Expand/collapse behavior
+-- Expand/collapse
 local expanded = false
 local function setExpanded(v)
     expanded = v
     if expanded then
-        mainFrame.Size = UDim2.new(0, 300, 0, 420)
-        scroller.Visible = true
-        scroller.CanvasSize = UDim2.new(0, 0, 0, uiList.AbsoluteContentSize.Y + 12)
+        main.Size = UDim2.new(0, 320, 0, 460)
+        scroll.Visible = true
+        info.Visible = true
+        -- update canvas size after elements
+        scroll.CanvasSize = UDim2.new(0, 0, 0, list.AbsoluteContentSize.Y + 12)
         expandBtn.Text = "−"
     else
-        mainFrame.Size = UDim2.new(0, 300, 0, 80)
-        scroller.Visible = false
+        main.Size = UDim2.new(0, 320, 0, 72)
+        scroll.Visible = false
+        info.Visible = false
         expandBtn.Text = "+"
     end
 end
 expandBtn.MouseButton1Click:Connect(function() setExpanded(not expanded) end)
 
--- Draggable with clamp to viewport
-local draggingWindow = false
+-- Draggable header (clamped to viewport)
+local dragging = false
 local dragStart = Vector2.new()
 local frameStart = Vector2.new()
-title.InputBegan:Connect(function(input)
+header.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        draggingWindow = true
+        dragging = true
         dragStart = input.Position
-        frameStart = Vector2.new(mainFrame.AbsolutePosition.X, mainFrame.AbsolutePosition.Y)
+        frameStart = Vector2.new(main.AbsolutePosition.X, main.AbsolutePosition.Y)
         input.Changed:Connect(function()
-            if input.UserInputState == Enum.UserInputState.End then draggingWindow = false end
+            if input.UserInputState == Enum.UserInputState.End then dragging = false end
         end)
     end
 end)
-title.InputChanged:Connect(function(input)
-    if draggingWindow and input.UserInputType == Enum.UserInputType.MouseMovement then
+header.InputChanged:Connect(function(input)
+    if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
         local delta = input.Position - dragStart
         local newPos = frameStart + delta
-        local vp = workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize or Vector2.new(1920,1080)
-        local clampedX = math.clamp(newPos.X, 0, math.max(0, vp.X - mainFrame.AbsoluteSize.X))
-        local clampedY = math.clamp(newPos.Y, 0, math.max(0, vp.Y - mainFrame.AbsoluteSize.Y))
-        mainFrame.Position = UDim2.new(0, clampedX, 0, clampedY)
+        local vp = camera and camera.ViewportSize or Vector2.new(1920,1080)
+        local clampedX = math.clamp(newPos.X, 0, math.max(0, vp.X - main.AbsoluteSize.X))
+        local clampedY = math.clamp(newPos.Y, 0, math.max(0, vp.Y - main.AbsoluteSize.Y))
+        main.Position = UDim2.new(0, clampedX, 0, clampedY)
     end
 end)
 
--- Particles (плавнее)
+-- Particles (smoother, fewer)
 local particles = {}
 local pdata = {}
 for i = 1, 36 do
     local p = Instance.new("Frame")
     p.Size = UDim2.new(0, 6, 0, 6)
     p.Position = UDim2.new(math.random(), 0, math.random(), 0)
-    p.BackgroundColor3 = Color3.fromRGB(180, 220, 255)
-    p.BackgroundTransparency = 0.45
+    p.BackgroundColor3 = Color3.fromRGB(140, 190, 255)
+    p.BackgroundTransparency = 0.5
     p.BorderSizePixel = 0
     p.ZIndex = 49
-    p.Parent = mainFrame
+    p.Parent = main
     Instance.new("UICorner", p).CornerRadius = UDim.new(1, 0)
     particles[#particles+1] = p
-    pdata[p] = { px = math.random()*6, py = math.random()*6, speed = 0.3 + math.random()*0.6, phase = math.random()*math.pi*2 }
+    pdata[p] = { phase = math.random()*6, speed = 0.6 + math.random()*0.8, ox = math.random(), oy = math.random() }
 end
 RunService.RenderStepped:Connect(function(dt)
     for _, p in ipairs(particles) do
         local d = pdata[p]
         d.phase = d.phase + dt * d.speed
-        local x = 0.08 + math.sin(d.phase * 0.9 + d.px) * 0.36
-        local y = 0.14 + math.cos(d.phase * 1.1 + d.py) * 0.36
+        local x = 0.08 + math.sin(d.phase + d.ox) * 0.36
+        local y = 0.12 + math.cos(d.phase * 1.1 + d.oy) * 0.36
         p.Position = UDim2.new(x, 0, y, 0)
-        p.BackgroundTransparency = 0.35 + 0.15 * math.sin(d.phase*2)
+        p.BackgroundTransparency = 0.35 + 0.12 * math.sin(d.phase*2)
     end
 end)
 
--- Function: safe WorldToViewport -> returns Vector2, onScreen, depth
-local function worldToScreen(pos)
-    if not camera then return nil, false, 0 end
-    local vec, onScreen = camera:WorldToViewportPoint(pos)
-    return Vector2.new(vec.X, vec.Y), onScreen, vec.Z
-end
-
--- ESP drawing helpers
-local function createQuad()
-    local ok, q = pcall(function() return Drawing.new("Quad") end)
-    if ok then
-        q.Thickness = 2
-        q.Transparency = 1
-        q.Visible = true
-        return q
-    end
+-- Drawing helpers (safe)
+local function safeNewDrawing(kind)
+    local ok, obj = pcall(function() return Drawing.new(kind) end)
+    if ok then return obj end
     return nil
+end
+local function createQuad()
+    local q = safeNewDrawing("Quad")
+    if q then q.Thickness = 2; q.Transparency = 1; q.Visible = false end
+    return q
 end
 local function createText()
-    local ok, t = pcall(function() return Drawing.new("Text") end)
-    if ok then
-        t.Size = 15
-        t.Center = true
-        t.Outline = true
-        t.Visible = true
-        return t
-    end
-    return nil
+    local t = safeNewDrawing("Text")
+    if t then t.Size = 15; t.Center = true; t.Outline = true; t.Visible = false end
+    return t
 end
 
--- Visibility check via Raycast
-local function isVisibleToCamera(targetCharacter)
-    if not targetCharacter or not camera then return false end
-    local targetPart = targetCharacter:FindFirstChild("Head") or targetCharacter.PrimaryPart or targetCharacter:FindFirstChild("HumanoidRootPart")
-    if not targetPart then return false end
+-- WorldToScreen helper
+local function worldToScreen(pos)
+    if not camera then return nil, false, 0 end
+    local v3, onScreen = camera:WorldToViewportPoint(pos)
+    return Vector2.new(v3.X, v3.Y), onScreen, v3.Z
+end
+
+-- Visibility check
+local function isVisibleToCamera(char)
+    if not char or not camera then return false end
+    local target = char:FindFirstChild("Head") or char.PrimaryPart or char:FindFirstChild("HumanoidRootPart")
+    if not target then return false end
     local origin = camera.CFrame.Position
-    local dir = targetPart.Position - origin
+    local dir = target.Position - origin
     if dir.Magnitude <= 0.001 then return true end
     local params = RaycastParams.new()
     params.FilterDescendantsInstances = { player.Character }
@@ -305,75 +313,71 @@ local function isVisibleToCamera(targetCharacter)
     params.IgnoreWater = true
     local res = Workspace:Raycast(origin, dir, params)
     if not res then return true end
-    if res.Instance and res.Instance:IsDescendantOf(targetCharacter) then
-        return true
-    end
+    if res.Instance and res.Instance:IsDescendantOf(char) then return true end
     return false
 end
 
--- Update ESP (throttled inside)
-local lastESP = 0
-local espInterval = 0.06
+-- Update ESP (throttled)
+local espTimer = 0
+local espRate = 0.06
 local function updateESP(dt)
-    lastESP = lastESP + dt
-    if lastESP < espInterval then return end
-    lastESP = 0
+    espTimer = espTimer + dt
+    if espTimer < espRate then return end
+    espTimer = 0
 
     for _, plr in ipairs(Players:GetPlayers()) do
         if plr == player then
-            if drawings.boxes[plr] then drawings.boxes[plr]:Remove(); drawings.boxes[plr]=nil end
-            if drawings.names[plr] then drawings.names[plr]:Remove(); drawings.names[plr]=nil end
+            if drawings.boxes[plr] then drawings.boxes[plr]:Remove(); drawings.boxes[plr] = nil end
+            if drawings.names[plr] then drawings.names[plr]:Remove(); drawings.names[plr] = nil end
             continue
         end
+
         local char = plr.Character
         if not char then
-            if drawings.boxes[plr] then drawings.boxes[plr]:Remove(); drawings.boxes[plr]=nil end
-            if drawings.names[plr] then drawings.names[plr]:Remove(); drawings.names[plr]=nil end
+            if drawings.boxes[plr] then drawings.boxes[plr]:Remove(); drawings.boxes[plr] = nil end
+            if drawings.names[plr] then drawings.names[plr]:Remove(); drawings.names[plr] = nil end
             continue
         end
+
         local head = char:FindFirstChild("Head")
         local root = char:FindFirstChild("HumanoidRootPart") or char.PrimaryPart
         local hum = char:FindFirstChildOfClass("Humanoid")
         if not (head and root and hum and hum.Health > 0) then
-            if drawings.boxes[plr] then drawings.boxes[plr]:Remove(); drawings.boxes[plr]=nil end
-            if drawings.names[plr] then drawings.names[plr]:Remove(); drawings.names[plr]=nil end
+            if drawings.boxes[plr] then drawings.boxes[plr]:Remove(); drawings.boxes[plr] = nil end
+            if drawings.names[plr] then drawings.names[plr]:Remove(); drawings.names[plr] = nil end
             continue
         end
 
-        local screenHead, onScreenHead, zHead = worldToScreen(head.Position + Vector3.new(0,0.5,0))
-        local screenLeg, onScreenLeg, zLeg = worldToScreen(root.Position - Vector3.new(0,3,0))
-        if not onScreenHead or zHead <= 0 or not onScreenLeg or zLeg <= 0 then
-            if drawings.boxes[plr] then drawings.boxes[plr]:Remove(); drawings.boxes[plr]=nil end
-            if drawings.names[plr] then drawings.names[plr]:Remove(); drawings.names[plr]=nil end
+        local screenHead, onHead, zHead = worldToScreen(head.Position + Vector3.new(0,0.5,0))
+        local screenFoot, onFoot, zFoot = worldToScreen(root.Position - Vector3.new(0,3,0))
+        if not onHead or not onFoot or zHead <= 0 or zFoot <= 0 then
+            if drawings.boxes[plr] then drawings.boxes[plr]:Remove(); drawings.boxes[plr] = nil end
+            if drawings.names[plr] then drawings.names[plr]:Remove(); drawings.names[plr] = nil end
             continue
         end
 
-        -- visibility
-        local dir = head.Position - camera.CFrame.Position
         local params = RaycastParams.new()
         params.FilterDescendantsInstances = { player.Character }
         params.FilterType = Enum.RaycastFilterType.Blacklist
         params.IgnoreWater = true
-        local res = Workspace:Raycast(camera.CFrame.Position, dir, params)
+        local res = Workspace:Raycast(camera.CFrame.Position, (head.Position - camera.CFrame.Position), params)
         local visible = (not res) or (res.Instance and res.Instance:IsDescendantOf(char))
 
-        local color = visible and Color3.fromRGB(0,255,120) or Color3.fromRGB(255,80,80)
+        local color = visible and Color3.fromRGB(0,255,140) or Color3.fromRGB(255,90,90)
 
-        -- box
         if not drawings.boxes[plr] then drawings.boxes[plr] = createQuad() end
         local box = drawings.boxes[plr]
         if box then
-            local height = math.abs(screenHead.Y - screenLeg.Y)
-            local width = math.max(12, height * 0.45)
+            local height = math.max(16, math.abs(screenHead.Y - screenFoot.Y))
+            local width = math.max(10, height * 0.45)
             box.PointA = Vector2.new(screenHead.X - width/2, screenHead.Y)
             box.PointB = Vector2.new(screenHead.X + width/2, screenHead.Y)
-            box.PointC = Vector2.new(screenHead.X + width/2, screenLeg.Y)
-            box.PointD = Vector2.new(screenHead.X - width/2, screenLeg.Y)
+            box.PointC = Vector2.new(screenHead.X + width/2, screenFoot.Y)
+            box.PointD = Vector2.new(screenHead.X - width/2, screenFoot.Y)
             box.Color = color
             box.Visible = true
         end
 
-        -- name text
         if not drawings.names[plr] then drawings.names[plr] = createText() end
         local txt = drawings.names[plr]
         if txt and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
@@ -386,10 +390,9 @@ local function updateESP(dt)
     end
 end
 
--- getClosest target inside FOV circle (screen-space distance from center)
-local function getClosestTargetInFOV()
-    local best = nil
-    local bestDist = math.huge
+-- Get closest target by screen distance from center inside FOV (returns head part)
+local function getClosestInFOV()
+    local best, bestD = nil, math.huge
     local center = Vector2.new(camera.ViewportSize.X/2, camera.ViewportSize.Y/2)
     local radius = (Settings.AimbotFOV/2) * (camera.ViewportSize.Y / math.tan(math.rad(camera.FieldOfView/2)))
     for _, plr in ipairs(Players:GetPlayers()) do
@@ -404,25 +407,23 @@ local function getClosestTargetInFOV()
         local screenHead, onScreen, z = worldToScreen(head.Position + Vector3.new(0,0.5,0))
         if not onScreen or z <= 0 then continue end
 
-        -- LOS check
-        local dir = head.Position - camera.CFrame.Position
         local params = RaycastParams.new()
         params.FilterDescendantsInstances = { player.Character }
         params.FilterType = Enum.RaycastFilterType.Blacklist
         params.IgnoreWater = true
-        local res = Workspace:Raycast(camera.CFrame.Position, dir, params)
+        local res = Workspace:Raycast(camera.CFrame.Position, (head.Position - camera.CFrame.Position), params)
         if res and not res.Instance:IsDescendantOf(char) then continue end
 
         local d = (screenHead - center).Magnitude
-        if d <= radius and d < bestDist then
-            bestDist = d
+        if d <= radius and d < bestD then
+            bestD = d
             best = head
         end
     end
     return best
 end
 
--- isAimHeld supports MouseButton and KeyCode binds
+-- Input check for bound key/button
 local function isAimHeld()
     if not aimBind or not aimBind.InputType then return false end
     local t = aimBind.InputType
@@ -437,21 +438,27 @@ local function isAimHeld()
     return false
 end
 
--- Aimbot: создаём/удаляем FOV drawing и запускаем RenderStepped
+-- Aimbot start/stop (manages camera type)
 local function startAimbot()
-    if aimbotConnection then aimbotConnection:Disconnect(); aimbotConnection = nil end
-    local ok, circ = pcall(function() return Drawing.new("Circle") end)
-    if ok and circ then
-        drawings.fov = circ
-        circ.Thickness = 2
-        circ.Color = Color3.fromRGB(255,120,100)
-        circ.NumSides = 120
-        circ.Visible = true
-    else
-        drawings.fov = nil
+    if aimbotConn then aimbotConn:Disconnect(); aimbotConn = nil end
+    originalCameraType = camera and camera.CameraType or nil
+    if camera then pcall(function() camera.CameraType = Enum.CameraType.Scriptable end) end
+
+    -- create fov drawing
+    if not drawings.fov then
+        local ok, c = pcall(function() return Drawing.new("Circle") end)
+        if ok and c then
+            drawings.fov = c
+            c.Thickness = 2
+            c.Color = Color3.fromRGB(255,140,110)
+            c.NumSides = 64
+            c.Visible = true
+        else
+            drawings.fov = nil
+        end
     end
 
-    aimbotConnection = RunService.RenderStepped:Connect(function(dt)
+    aimbotConn = RunService.RenderStepped:Connect(function(dt)
         if drawings.fov then
             local radius = (Settings.AimbotFOV/2) * (camera.ViewportSize.Y / math.tan(math.rad(camera.FieldOfView/2)))
             drawings.fov.Radius = radius
@@ -460,19 +467,14 @@ local function startAimbot()
         end
 
         if not Settings.Aimbot then return end
+        if Settings.AimbotHoldMode and not isAimHeld() then return end
 
-        if Settings.AimbotHoldMode then
-            if not isAimHeld() then return end
-        else
-            -- toggle mode: if not held, still allow (Settings.Aimbot true => active)
-        end
+        local targetHead = getClosestInFOV()
+        if not targetHead then return end
 
-        local target = getClosestTargetInFOV()
-        if not target then return end
-
-        local targetPos = target.Position + Vector3.new(0, 0.2, 0)
+        local targetPosition = targetHead.Position + Vector3.new(0, 0.15, 0)
         local camPos = camera.CFrame.Position
-        local goal = CFrame.new(camPos, targetPos)
+        local goal = CFrame.new(camPos, targetPosition)
         local smooth = math.clamp(Settings.AimbotSmooth or 0.15, 0, 1)
         local alpha = 1 - math.exp(-smooth * 60 * dt)
         camera.CFrame = camera.CFrame:Lerp(goal, alpha)
@@ -480,29 +482,29 @@ local function startAimbot()
 end
 
 local function stopAimbot()
-    if aimbotConnection then aimbotConnection:Disconnect(); aimbotConnection = nil end
+    if aimbotConn then aimbotConn:Disconnect(); aimbotConn = nil end
     if drawings.fov then pcall(function() drawings.fov:Remove() end); drawings.fov = nil end
+    if camera and originalCameraType then pcall(function() camera.CameraType = originalCameraType end) end
+    originalCameraType = nil
 end
 
--- Toggle functions
-local function toggleESP(v)
+-- Toggle wrappers
+local function setESP(v)
     Settings.ESP = v
     if not v then
         for k,_ in pairs(drawings.boxes) do if drawings.boxes[k] then drawings.boxes[k]:Remove(); drawings.boxes[k]=nil end end
         for k,_ in pairs(drawings.names) do if drawings.names[k] then drawings.names[k]:Remove(); drawings.names[k]=nil end end
     end
 end
-
-local function toggleAimbotState(v)
+local function setAimbot(v)
     Settings.Aimbot = v
     if v then startAimbot() else stopAimbot() end
 end
-
-local function toggleNoclip(v)
+local function setNoclip(v)
     Settings.Noclip = v
-    if noclipConnection then noclipConnection:Disconnect(); noclipConnection = nil end
+    if noclipConn then noclipConn:Disconnect(); noclipConn = nil end
     if v then
-        noclipConnection = RunService.Stepped:Connect(function()
+        noclipConn = RunService.Stepped:Connect(function()
             if player.Character then
                 for _, part in ipairs(player.Character:GetDescendants()) do
                     if part:IsA("BasePart") then
@@ -513,145 +515,122 @@ local function toggleNoclip(v)
         end)
     end
 end
-
-local function toggleFly(v)
+local function setFly(v)
     Settings.Fly = v
-    if flyBodyVelocity then flyBodyVelocity:Destroy(); flyBodyVelocity = nil end
+    if flyBV then flyBV:Destroy(); flyBV = nil end
     if v then
         local root = player.Character and (player.Character:FindFirstChild("HumanoidRootPart") or player.Character.PrimaryPart)
         if root then
-            flyBodyVelocity = Instance.new("BodyVelocity")
-            flyBodyVelocity.MaxForce = Vector3.new(1e5,1e5,1e5)
-            flyBodyVelocity.Velocity = Vector3.new(0,0,0)
-            flyBodyVelocity.Parent = root
+            flyBV = Instance.new("BodyVelocity")
+            flyBV.MaxForce = Vector3.new(1e5,1e5,1e5)
+            flyBV.Velocity = Vector3.new(0,0,0)
+            flyBV.Parent = root
         end
     end
 end
 
--- UI: добавляем контролы в scroller
-createToggle("ESP (Green = visible)", "ESP", function(v) toggleESP(v) end)
-createToggle("Aimbot (Hold mode)", "Aimbot", function(v) toggleAimbotState(v) end)
+-- UI creation: add rows
+local tESP = makeToggle("ESP (visible=green)", Settings.ESP, function(v) setESP(v) end)
+local tAIM = makeToggle("Aimbot (hold/toggle)", Settings.Aimbot, function(v) setAimbot(v) end)
+local tTEAM = makeToggle("Team check", Settings.TeamCheck, function(v) Settings.TeamCheck = v end)
+local tHOLD = makeToggle("Hold mode (if ON, hold bind)", Settings.AimbotHoldMode, function(v) Settings.AimbotHoldMode = v end)
+local tFLY = makeToggle("Fly (WASD + Space/Q)", Settings.Fly, function(v) setFly(v) end)
+local tNOCLIP = makeToggle("Noclip", Settings.Noclip, function(v) setNoclip(v) end)
+local tINFJ = makeToggle("Infinite Jump", Settings.InfiniteJump, function(v) Settings.InfiniteJump = v end)
 
--- Aimbot Hold/Toggle switch
+-- Bind row
 do
-    local f = makeControlFrame(36)
-    local lbl = Instance.new("TextLabel", f)
-    lbl.Size = UDim2.new(0.6,0,1,0)
-    lbl.BackgroundTransparency = 1
-    lbl.Text = "Hold Mode (if on — hold bind, else toggle)"
-    lbl.TextXAlignment = Enum.TextXAlignment.Left
-    lbl.TextColor3 = Color3.fromRGB(220,220,220)
-    lbl.Font = Enum.Font.Gotham
-    lbl.TextSize = 13
-
-    local btn = Instance.new("TextButton", f)
-    btn.Size = UDim2.new(0, 60, 0, 26)
-    btn.Position = UDim2.new(1, -70, 0, 5)
-    btn.Text = Settings.AimbotHoldMode and "ON" or "OFF"
-    btn.BackgroundColor3 = Settings.AimbotHoldMode and Color3.fromRGB(0,180,110) or Color3.fromRGB(60,60,60)
-    btn.Font = Enum.Font.GothamBold
-    btn.TextSize = 14
-    Instance.new("UICorner", btn).CornerRadius = UDim.new(0,6)
-    btn.MouseButton1Click:Connect(function()
-        Settings.AimbotHoldMode = not Settings.AimbotHoldMode
-        btn.Text = Settings.AimbotHoldMode and "ON" or "OFF"
-        btn.BackgroundColor3 = Settings.AimbotHoldMode and Color3.fromRGB(0,180,110) or Color3.fromRGB(60,60,60)
-    end)
-end
-
--- Bind UI (кнопка, ждёт следующего InputBegan чтобы установить bind)
-do
-    local f = makeControlFrame(36)
+    local f = makeRow(36)
     local lbl = Instance.new("TextLabel", f)
     lbl.Size = UDim2.new(0.4,0,1,0)
     lbl.BackgroundTransparency = 1
     lbl.Text = "Aimbot bind:"
-    lbl.TextColor3 = Color3.fromRGB(220,220,220)
+    lbl.TextColor3 = Color3.fromRGB(230,230,230)
     lbl.Font = Enum.Font.Gotham
-    lbl.TextSize = 13
+    lbl.TextSize = 14
     lbl.TextXAlignment = Enum.TextXAlignment.Left
 
     local btn = Instance.new("TextButton", f)
-    btn.Size = UDim2.new(0, 140, 0, 26)
-    btn.Position = UDim2.new(1, -150, 0, 5)
-    btn.Text = "MouseButton2 (RMB)"
+    btn.Size = UDim2.new(0,160,0,26)
+    btn.Position = UDim2.new(1, -170, 0, 5)
+    btn.BackgroundColor3 = Color3.fromRGB(55,55,55)
     btn.Font = Enum.Font.GothamBold
     btn.TextSize = 14
-    btn.BackgroundColor3 = Color3.fromRGB(60,60,60)
+    btn.TextColor3 = Color3.fromRGB(240,240,240)
     Instance.new("UICorner", btn).CornerRadius = UDim.new(0,6)
 
-    btn.MouseButton1Click:Connect(function()
-        bindingMode = true
-        btn.Text = "Press any key/button..."
-        btn.BackgroundColor3 = Color3.fromRGB(100,100,100)
-        -- waiting handled in global InputBegan below
-    end)
-
-    -- when bind changed, update text
-    local function updateBindText()
+    local function bindText()
         if not aimBind or not aimBind.InputType then btn.Text = "None"; return end
         if aimBind.InputType == Enum.UserInputType.Keyboard and aimBind.KeyCode then
             btn.Text = tostring(aimBind.KeyCode):gsub("Enum.KeyCode.","")
         else
             btn.Text = tostring(aimBind.InputType):gsub("Enum.UserInputType.","")
         end
-        btn.BackgroundColor3 = Color3.fromRGB(60,60,60)
     end
-    updateBindText()
+    bindText()
 
-    -- store update function
-    scroller:GetPropertyChangedSignal("CanvasSize"):Connect(function()
-        scroller.CanvasSize = UDim2.new(0,0,0,uiList.AbsoluteContentSize.Y + 12)
+    btn.MouseButton1Click:Connect(function()
+        bindingMode = true
+        btn.Text = "Press any key/button..."
+        btn.BackgroundColor3 = Color3.fromRGB(100,100,100)
+    end)
+
+    -- update canvas size hook
+    list:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+        scroll.CanvasSize = UDim2.new(0,0,0, list.AbsoluteContentSize.Y + 12)
     end)
 end
 
--- global InputBegan: if bindingMode -> capture bind
+-- Sliders
+makeSlider("Walk Speed", 8, 500, Settings.WalkSpeed, function(v)
+    Settings.WalkSpeed = v
+    local h = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
+    if h then pcall(function() h.WalkSpeed = v end) end
+end)
+makeSlider("Fly Speed", 1, 200, Settings.FlySpeed, function(v) Settings.FlySpeed = v end)
+makeSlider("Aimbot FOV", 20, 360, Settings.AimbotFOV, function(v) Settings.AimbotFOV = v end)
+makeSlider("Aimbot Smooth (smaller=faster)", 5, 80, math.floor((Settings.AimbotSmooth or 0.15)*100), function(v) Settings.AimbotSmooth = v/100 end)
+
+-- Capture bind
 UserInputService.InputBegan:Connect(function(input, processed)
     if processed then return end
     if bindingMode then
         aimBind.InputType = input.UserInputType
         aimBind.KeyCode = input.KeyCode ~= Enum.KeyCode.Unknown and input.KeyCode or nil
         bindingMode = false
-        -- update bind button text (search it)
-        for _, child in ipairs(scroller:GetChildren()) do
+        -- update bind button text
+        for _, child in ipairs(scroll:GetChildren()) do
             if child:IsA("Frame") then
                 local tb = child:FindFirstChildOfClass("TextButton")
-                if tb and (tb.Text == "Press any key/button..." or tb.Text:match("Mouse") ) then
-                    tb.Text = (aimBind.InputType == Enum.UserInputType.Keyboard and tostring(aimBind.KeyCode):gsub("Enum.KeyCode.","")) or tostring(aimBind.InputType):gsub("Enum.UserInputType.","")
-                    tb.BackgroundColor3 = Color3.fromRGB(60,60,60)
+                local tl = child:FindFirstChildOfClass("TextLabel")
+                if tb and tl and tl.Text:find("Aimbot bind") then
+                    if aimBind.InputType == Enum.UserInputType.Keyboard and aimBind.KeyCode then
+                        tb.Text = tostring(aimBind.KeyCode):gsub("Enum.KeyCode.","")
+                    else
+                        tb.Text = tostring(aimBind.InputType):gsub("Enum.UserInputType.","")
+                    end
+                    tb.BackgroundColor3 = Color3.fromRGB(55,55,55)
                     break
                 end
             end
         end
-        return
     end
 end)
 
--- Sliders
-createSlider("Walk Speed", 16, 500, Settings.WalkSpeed or 16, function(v)
-    Settings.WalkSpeed = v
-    if player.Character and player.Character:FindFirstChildOfClass("Humanoid") then
-        player.Character:FindFirstChildOfClass("Humanoid").WalkSpeed = v
+-- Infinite jump
+UserInputService.JumpRequest:Connect(function()
+    if Settings.InfiniteJump and player.Character then
+        local hum = player.Character:FindFirstChildOfClass("Humanoid")
+        if hum then pcall(function() hum:ChangeState(Enum.HumanoidStateType.Jumping) end) end
     end
 end)
-createSlider("Fly Speed", 1, 200, Settings.FlySpeed, function(v) Settings.FlySpeed = v end)
-createSlider("Aimbot FOV", 30, 360, Settings.AimbotFOV, function(v) Settings.AimbotFOV = v end)
-createSlider("Aimbot Smooth (smaller = faster)", 5, 50, math.floor((Settings.AimbotSmooth or 0.15)*100), function(v)
-    Settings.AimbotSmooth = v/100
-end)
 
--- auto update scroller canvas size
-scroller.CanvasSize = UDim2.new(0, 0, 0, uiList.AbsoluteContentSize.Y + 12)
-uiList:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-    scroller.CanvasSize = UDim2.new(0, 0, 0, uiList.AbsoluteContentSize.Y + 12)
-end)
-
--- Main loop: update ESP and fly behavior
+-- Main loop: ESP + Fly physics + throttling
 RunService.RenderStepped:Connect(function(dt)
     if Settings.ESP then updateESP(dt) end
 
-    -- Fly movement
-    if Settings.Fly and flyBodyVelocity then
+    -- Fly
+    if Settings.Fly and flyBV then
         local root = player.Character and (player.Character:FindFirstChild("HumanoidRootPart") or player.Character.PrimaryPart)
         if root then
             local move = Vector3.new()
@@ -663,43 +642,24 @@ RunService.RenderStepped:Connect(function(dt)
             if UserInputService:IsKeyDown(Enum.KeyCode.Space) then move += Vector3.new(0,1,0) end
             if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then move -= Vector3.new(0,1,0) end
             if move.Magnitude > 0 then move = move.Unit else move = Vector3.new(0,0,0) end
-            flyBodyVelocity.Velocity = move * (Settings.FlySpeed or 50)
+            flyBV.Velocity = move * (Settings.FlySpeed or 60)
         end
     end
 end)
 
--- Start/stop aimbot depending on Settings and hold-mode
--- ensure start if toggled on
-local function ensureAimbotState()
-    if Settings.Aimbot then startAimbot() else stopAimbot() end
-end
-
--- Hook Settings toggles via local helper: find toggle by label text and set initial state
-for _, child in ipairs(scroller:GetChildren()) do
-    if child:IsA("Frame") then
-        local lbl = child:FindFirstChildOfClass("TextLabel")
-        local btn = child:FindFirstChildOfClass("TextButton")
-        if lbl and btn then
-            local keyText = lbl.Text
-            if keyText:match("ESP") then
-                btn.Text = Settings.ESP and "ON" or "OFF"
-            elseif keyText:match("Aimbot %- Hold") or keyText:match("Aimbot %(") then
-                btn.Text = Settings.Aimbot and "ON" or "OFF"
-            end
-        end
-    end
-end
-
--- Cleanup on leave
+-- Ensure aimbot state on toggle changes
+-- (If user toggles Aimbot via UI, start/stop handled above in setAimbot)
+-- Clean up drawings on player removal / character removal
 Players.PlayerRemoving:Connect(function(pl)
-    if drawings.boxes[pl] then drawings.boxes[pl]:Remove(); drawings.boxes[pl]=nil end
-    if drawings.names[pl] then drawings.names[pl]:Remove(); drawings.names[pl]=nil end
+    if drawings.boxes[pl] then drawings.boxes[pl]:Remove(); drawings.boxes[pl] = nil end
+    if drawings.names[pl] then drawings.names[pl]:Remove(); drawings.names[pl] = nil end
 end)
 player.CharacterRemoving:Connect(function()
-    for k,_ in pairs(drawings.boxes) do if drawings.boxes[k] then drawings.boxes[k]:Remove(); drawings.boxes[k]=nil end end
-    for k,_ in pairs(drawings.names) do if drawings.names[k] then drawings.names[k]:Remove(); drawings.names[k]=nil end end
+    for k,_ in pairs(drawings.boxes) do if drawings.boxes[k] then drawings.boxes[k]:Remove(); drawings.boxes[k] = nil end end
+    for k,_ in pairs(drawings.names) do if drawings.names[k] then drawings.names[k]:Remove(); drawings.names[k] = nil end end
+    if flyBV then flyBV:Destroy(); flyBV = nil end
 end)
 
--- Initialization
+-- init
 setExpanded(false)
-print("Salt v5 UI loaded — протестируйте. По умолчанию Aimbot bind = MouseButton2 (RMB).")
+print("Salt v5 — переработанный интерфейс загружен. По умолчанию Aimbot bind = MouseButton2 (держать).")
