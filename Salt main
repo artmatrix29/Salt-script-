@@ -1,24 +1,35 @@
--- salt v2 | Минимальная рабочая версия (запускается)
+-- salt v2 | Обновленный хаб с фиксами спавна (используем Remote для спавна, задержка для броска)
 
 local Players = game:GetService("Players")
 local UIS = game:GetService("UserInputService")
 local RS = game:GetService("RunService")
 local WS = game:GetService("Workspace")
 local Debris = game:GetService("Debris")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Player = Players.LocalPlayer
 local Mouse = Player:GetMouse()
 
 local flying = false
 local noclipping = true
+local antiGrab = false
+local backTP = false
+
 local bodyVelocity, bodyGyro, noclipConn
 
-local TOY_NAMES = {"Firework", "Missile", "Snowball", "Balloon", "Campfire"}
+-- Игрушки (по твоему запросу)
+local TOY_NAMES = {"Sparkler", "Missile", "Snowball", "Balloon", "Campfire"}
 
 local selectedTarget = nil
 local selectedToyName = nil
 local powerValue = 500
 local quantityValue = 1
+
+-- Remote для спавна (из скриптов игры)
+local SpawnToyRemote = ReplicatedStorage.MenuToys:FindFirstChild("SpawnToyRemoteFunction") or ReplicatedStorage:FindFirstChild("SpawnToyRemoteFunction")
+local BombExplodeRemote = ReplicatedStorage:FindFirstChild("BombExplode")  -- для комбо, если есть
+
+local superStrength = 1500  -- сила броска на RMB
 
 -- GUI
 local ScreenGui = Instance.new("ScreenGui")
@@ -36,7 +47,7 @@ MainFrame.Position = UDim2.new(0.5, -250, 0.5, -200)
 MainFrame.Size = UDim2.new(0, 500, 0, 450)
 MainFrame.Active = true
 MainFrame.Draggable = true
-MainFrame.Visible = true  -- сразу видно для теста
+MainFrame.Visible = true
 
 local UICorner = Instance.new("UICorner", MainFrame)
 UICorner.CornerRadius = UDim.new(0,12)
@@ -74,10 +85,10 @@ TargetsScroll.CanvasSize = UDim2.new(0,0,0,0)
 local ToysScroll = Instance.new("ScrollingFrame")
 ToysScroll.Parent = MainFrame
 ToysScroll.BackgroundColor3 = Color3.fromRGB(10,10,10)
-ToysScroll.Position = UDim2.new(0.52,0,0.13,0)
-ToysScroll.Size = UDim2.new(0.46,0,0.4,0)
-ToysScroll.ScrollBarImageColor3 = Color3.fromRGB(0,255,128)
-ToysScroll.CanvasSize = UDim2.new(0,0,0,0)
+TargetsScroll.Position = UDim2.new(0.52,0,0.13,0)
+TargetsScroll.Size = UDim2.new(0.46,0,0.4,0)
+TargetsScroll.ScrollBarImageColor3 = Color3.fromRGB(0,255,128)
+TargetsScroll.CanvasSize = UDim2.new(0,0,0,0)
 
 -- Power Label & Slider
 local PowerLabel = Instance.new("TextLabel")
@@ -121,16 +132,17 @@ QuantityFill.Parent = QuantityTrack
 QuantityFill.BackgroundColor3 = Color3.fromRGB(0,255,128)
 QuantityFill.Size = UDim2.new(0.2,0,1,0)
 
--- Кнопки
+-- Throw Btn
 local ThrowBtn = Instance.new("TextButton")
 ThrowBtn.Parent = MainFrame
 ThrowBtn.BackgroundColor3 = Color3.fromRGB(0,255,128)
 ThrowBtn.Position = UDim2.new(0.05,0,0.82,0)
 ThrowBtn.Size = UDim2.new(0.9,0,0,45)
-ThrowBtn.Text = "Throw Selected Toy"
+ThrowBtn.Text = "Spawn and Throw Toy"
 ThrowBtn.TextColor3 = Color3.new(0,0,0)
 ThrowBtn.TextScaled = true
 
+-- TP Btn
 local TPBtn = Instance.new("TextButton")
 TPBtn.Parent = MainFrame
 TPBtn.BackgroundColor3 = Color3.fromRGB(0,200,255)
@@ -140,7 +152,7 @@ TPBtn.Text = "TP to Selected Player"
 TPBtn.TextColor3 = Color3.new(0,0,0)
 TPBtn.TextScaled = true
 
--- Fly & Noclip внизу
+-- Fly & Noclip
 local FlyBtn = Instance.new("TextButton")
 FlyBtn.Parent = MainFrame
 FlyBtn.BackgroundColor3 = Color3.fromRGB(80,80,80)
@@ -159,7 +171,53 @@ NoclipBtn.Text = "Noclip: ON"
 NoclipBtn.TextColor3 = Color3.new(0,0,0)
 NoclipBtn.TextScaled = true
 
--- Обновление списка игроков
+-- Функции
+local function toggleFly(state)
+    flying = state
+    local root = Player.Character and Player.Character.HumanoidRootPart
+    if not root then return end
+    if flying then
+        bodyVelocity = Instance.new("BodyVelocity", root)
+        bodyVelocity.MaxForce = Vector3.new(1e5,1e5,1e5)
+        bodyVelocity.Velocity = Vector3.new()
+        bodyGyro = Instance.new("BodyGyro", root)
+        bodyGyro.MaxTorque = Vector3.new(1e5,1e5,1e5)
+        spawn(function()
+            while flying do
+                local cam = WS.CurrentCamera
+                local move = Vector3.new()
+                if UIS:IsKeyDown(Enum.KeyCode.W) then move = move + cam.CFrame.LookVector end
+                if UIS:IsKeyDown(Enum.KeyCode.S) then move = move - cam.CFrame.LookVector end
+                if UIS:IsKeyDown(Enum.KeyCode.A) then move = move - cam.CFrame.RightVector end
+                if UIS:IsKeyDown(Enum.KeyCode.D) then move = move + cam.CFrame.RightVector end
+                if UIS:IsKeyDown(Enum.KeyCode.Space) then move = move + Vector3.new(0,1,0) end
+                if UIS:IsKeyDown(Enum.KeyCode.LeftControl) then move = move - Vector3.new(0,1,0) end
+                bodyVelocity.Velocity = move * 80
+                bodyGyro.CFrame = cam.CFrame
+                RS.Heartbeat:Wait()
+            end
+        end)
+    else
+        if bodyVelocity then bodyVelocity:Destroy() end
+        if bodyGyro then bodyGyro:Destroy() end
+    end
+end
+
+local function toggleNoclip(state)
+    noclipping = state
+    if noclipConn then noclipConn:Disconnect() end
+    if noclipping then
+        noclipConn = RS.Stepped:Connect(function()
+            local char = Player.Character
+            if char then
+                for _, part in pairs(char:GetDescendants()) do
+                    if part:IsA("BasePart") then part.CanCollide = false end
+                end
+            end
+        end)
+    end
+end
+
 local function updatePlayers()
     for _, b in pairs(TargetsScroll:GetChildren()) do if b:IsA("TextButton") then b:Destroy() end end
     local y = 0
@@ -176,14 +234,13 @@ local function updatePlayers()
             btn.MouseButton1Click:Connect(function()
                 selectedTarget = p
                 updatePlayers()
-            end)
+            end
             y = y + 35
         end
     end
     TargetsScroll.CanvasSize = UDim2.new(0,0,0,y)
 end
 
--- Обновление игрушек
 local function updateToys()
     for _, b in pairs(ToysScroll:GetChildren()) do if b:IsA("TextButton") then b:Destroy() end end
     local y = 0
@@ -199,124 +256,102 @@ local function updateToys()
         btn.MouseButton1Click:Connect(function()
             selectedToyName = name
             updateToys()
-        end)
+        end
         y = y + 35
     end
     ToysScroll.CanvasSize = UDim2.new(0,0,0,y)
 end
 
--- Slider Power
-local draggingP = false
-SliderTrack.InputBegan:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 then draggingP = true end end)
-UIS.InputEnded:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 then draggingP = false end end)
-RS.RenderStepped:Connect(function()
-    if draggingP then
-        local rel = math.clamp((Mouse.X - SliderTrack.AbsolutePosition.X) / SliderTrack.AbsoluteSize.X, 0, 1)
-        SliderFill.Size = UDim2.new(rel,0,1,0)
-        powerValue = math.floor(100 + 4900 * rel)
-        PowerLabel.Text = "Power: " .. powerValue
+-- Super Throw
+WS.ChildAdded:Connect(function(child)
+    if child.Name == "GrabParts" then
+        local grabPart = child:FindFirstChild("GrabPart")
+        if grabPart then
+            local weld = grabPart:FindFirstChildOfClass("WeldConstraint")
+            if weld and weld.Part1 then
+                local grabbed = weld.Part1
+                child.AncestryChanged:Connect(function()
+                    if not child.Parent then
+                        if UIS:GetLastInputType() == Enum.UserInputType.MouseButton2 then
+                            local bv = Instance.new("BodyVelocity", grabbed)
+                            bv.MaxForce = Vector3.new(1e9,1e9,1e9)
+                            bv.Velocity = WS.CurrentCamera.CFrame.LookVector * superStrength + Vector3.new(0,300,0)
+                            Debris:AddItem(bv, 0.5)
+                        end
+                    end
+                end)
+            end
+        end
     end
 end)
 
--- Slider Quantity
-local draggingQ = false
-QuantityTrack.InputBegan:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 then draggingQ = true end end)
-UIS.InputEnded:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 then draggingQ = false end end)
-RS.RenderStepped:Connect(function()
-    if draggingQ then
-        local rel = math.clamp((Mouse.X - QuantityTrack.AbsolutePosition.X) / QuantityTrack.AbsoluteSize.X, 0, 1)
-        QuantityFill.Size = UDim2.new(rel,0,1,0)
-        quantityValue = math.floor(1 + 4 * rel)
-        QuantityLabel.Text = "Quantity: " .. quantityValue
-    end
-end)
-
--- Throw (с задержкой)
+-- Кнопки
 ThrowBtn.MouseButton1Click:Connect(function()
     if not selectedTarget or not selectedToyName then return end
     local targetPos = selectedTarget.Character.HumanoidRootPart.Position
     for i = 1, quantityValue do
-        spawn(function()
-            local toy = ReplicatedStorage:FindFirstChild(selectedToyName, true) or WS:FindFirstChild(selectedToyName, true)
-            if toy then
-                local clone = toy:Clone()
-                clone.Parent = WS
-                local part = clone.PrimaryPart or clone:FindFirstChildWhichIsA("BasePart")
-                if part then
-                    part.CFrame = CFrame.new(targetPos + Vector3.new(math.random(-8,8), 15, math.random(-8,8)))
-                    wait(0.3)  -- задержка спавна → бросок
-                    local bv = Instance.new("BodyVelocity", part)
-                    bv.Velocity = (targetPos - part.Position).Unit * powerValue + Vector3.new(0, powerValue * 0.3, 0)
-                    bv.MaxForce = Vector3.new(1e6,1e6,1e6)
-                    Debris:AddItem(bv, 3)
-                    Debris:AddItem(clone, 10)
-                end
+        local cframe = CFrame.new(targetPos + Vector3.new(math.random(-8,8), 15, math.random(-8,8)))
+        SpawnToyRemote:InvokeServer(selectedToyName, cframe)
+        wait(0.3)  -- задержка для спавна
+        local spawned = WS:FindFirstChild(selectedToyName, true)
+        if spawned then
+            local part = spawned.PrimaryPart or spawned:FindFirstChildWhichIsA("BasePart")
+            if part then
+                local bv = Instance.new("BodyVelocity", part)
+                bv.Velocity = (targetPos - part.Position).Unit * powerValue + Vector3.new(0, powerValue * 0.3, 0)
+                bv.MaxForce = Vector3.new(1e6,1e6,1e6)
+                Debris:AddItem(bv, 3)
+                Debris:AddItem(spawned, 10)
             end
-        end)
-        wait(0.4)  -- между бросками
+        end
     end
 end)
 
--- TP
 TPBtn.MouseButton1Click:Connect(function()
     if selectedTarget and selectedTarget.Character then
-        local hrp = Player.Character and Player.Character:FindFirstChild("HumanoidRootPart")
-        if hrp then
-            hrp.CFrame = selectedTarget.Character.HumanoidRootPart.CFrame * CFrame.new(0,0,-6)
-        end
+        local hrp = Player.Character and Player.Character.HumanoidRootPart
+        if hrp then hrp.CFrame = selectedTarget.Character.HumanoidRootPart.CFrame * CFrame.new(0,0,-6) end
     end
 end)
 
--- Fly & Noclip
 FlyBtn.MouseButton1Click:Connect(function()
-    flying = not flying
-    local root = Player.Character and Player.Character:FindFirstChild("HumanoidRootPart")
-    if root then
-        if flying then
-            bodyVelocity = Instance.new("BodyVelocity", root)
-            bodyVelocity.MaxForce = Vector3.new(1e5,1e5,1e5)
-            bodyVelocity.Velocity = Vector3.new()
-            bodyGyro = Instance.new("BodyGyro", root)
-            bodyGyro.MaxTorque = Vector3.new(1e5,1e5,1e5)
-            spawn(function()
-                while flying do
-                    local cam = WS.CurrentCamera
-                    local move = Vector3.new()
-                    if UIS:IsKeyDown(Enum.KeyCode.W) then move = move + cam.CFrame.LookVector end
-                    if UIS:IsKeyDown(Enum.KeyCode.S) then move = move - cam.CFrame.LookVector end
-                    if UIS:IsKeyDown(Enum.KeyCode.A) then move = move - cam.CFrame.RightVector end
-                    if UIS:IsKeyDown(Enum.KeyCode.D) then move = move + cam.CFrame.RightVector end
-                    if UIS:IsKeyDown(Enum.KeyCode.Space) then move = move + Vector3.new(0,1,0) end
-                    if UIS:IsKeyDown(Enum.KeyCode.LeftControl) then move = move - Vector3.new(0,1,0) end
-                    bodyVelocity.Velocity = move * 80
-                    bodyGyro.CFrame = cam.CFrame
-                    RS.Heartbeat:Wait()
-                end
-            end)
-        else
-            if bodyVelocity then bodyVelocity:Destroy() end
-            if bodyGyro then bodyGyro:Destroy() end
-        end
-    end
+    toggleFly(not flying)
     FlyBtn.BackgroundColor3 = flying and Color3.fromRGB(0,255,128) or Color3.fromRGB(80,80,80)
     FlyBtn.Text = "Fly: " .. (flying and "ON" or "OFF")
 end)
 
 NoclipBtn.MouseButton1Click:Connect(function()
-    noclipping = not noclipping
-    if noclipConn then noclipConn:Disconnect() end
-    if noclipping then
-        noclipConn = RS.Stepped:Connect(function()
-            local char = Player.Character
-            if char then
-                for _, part in pairs(char:GetDescendants()) do
-                    if part:IsA("BasePart") then part.CanCollide = false end
-                end
-            end
-        end)
-    end
+    toggleNoclip(not noclipping)
     NoclipBtn.BackgroundColor3 = noclipping and Color3.fromRGB(0,255,128) or Color3.fromRGB(80,80,80)
     NoclipBtn.Text = "Noclip: " .. (noclipping and "ON" or "OFF")
+end)
+
+-- Комбо Campfire + Bomb
+local ComboBtn = Instance.new("TextButton")
+ComboBtn.Parent = MainFrame
+ComboBtn.BackgroundColor3 = Color3.fromRGB(0,255,128)
+ComboBtn.Position = UDim2.new(0.05,0,0.82,0)
+ComboBtn.Size = UDim2.new(0.9,0,0,45)
+ComboBtn.Text = "Campfire + Bomb Combo"
+ComboBtn.TextColor3 = Color3.new(0,0,0)
+ComboBtn.TextScaled = true
+
+ComboBtn.MouseButton1Click:Connect(function()
+    if not selectedTarget then return end
+    local targetPos = selectedTarget.Character.HumanoidRootPart.Position
+    local cframe = CFrame.new(targetPos)
+    SpawnToyRemote:InvokeServer("Campfire", cframe)
+    wait(0.5)
+    local campfire = WS:FindFirstChild("Campfire", true)
+    if campfire then
+        local bombCframe = CFrame.new(campfire.Position + Vector3.new(0,1,0))
+        SpawnToyRemote:InvokeServer("Bomb", bombCframe)
+        wait(0.2)
+        local bomb = WS:FindFirstChild("Bomb", true)
+        if bomb and BombExplodeRemote then
+            BombExplodeRemote:FireServer(bomb, campfire.Position)  -- взрыв
+        end
+    end
 end)
 
 -- Авто-обновление
@@ -333,4 +368,37 @@ updateToys()
 -- Закрытие
 CloseBtn.MouseButton1Click:Connect(function()
     MainFrame.Visible = false
+end)
+
+-- Toggle GUI
+UIS.InputBegan:Connect(function(input)
+    if input.KeyCode == Enum.KeyCode.Insert then
+        MainFrame.Visible = not MainFrame.Visible
+    end
+end)
+
+-- Инит Noclip
+toggleNoclip(true)
+
+-- Super Throw
+WS.ChildAdded:Connect(function(child)
+    if child.Name == "GrabParts" then
+        local grabPart = child:FindFirstChild("GrabPart")
+        if grabPart then
+            local weld = grabPart:FindFirstChildOfClass("WeldConstraint")
+            if weld and weld.Part1 then
+                local grabbed = weld.Part1
+                child.AncestryChanged:Connect(function()
+                    if not child.Parent then
+                        if UIS:GetLastInputType() == Enum.UserInputType.MouseButton2 then
+                            local bv = Instance.new("BodyVelocity", grabbed)
+                            bv.MaxForce = Vector3.new(1e9,1e9,1e9)
+                            bv.Velocity = WS.CurrentCamera.CFrame.LookVector * superStrength + Vector3.new(0,300,0)
+                            Debris:AddItem(bv, 0.5)
+                        end
+                    end
+                end)
+            end
+        end
+    end
 end)
