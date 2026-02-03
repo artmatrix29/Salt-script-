@@ -1,4 +1,4 @@
--- salt v2 | Стабильная версия 2026 (Activated вместо MouseButton1Click)
+-- salt v2 | Стабильная версия как в первых скриптах (MouseButton1Click)
 
 local Players = game:GetService("Players")
 local UIS = game:GetService("UserInputService")
@@ -6,6 +6,7 @@ local RS = game:GetService("RunService")
 local WS = game:GetService("Workspace")
 
 local Player = Players.LocalPlayer
+local Mouse = Player:GetMouse()
 
 local flying = false
 local noclipping = false
@@ -13,13 +14,14 @@ local antiGrab = false
 local backTP = false
 local tracking = false
 local selectedTarget = nil
+
 local grabReach = 100
 local pullStrength = 10
 local throwStrength = 1500
 
 local tpKey = Enum.KeyCode.Z
 
-print("salt v2 - запуск...")
+print("=== salt v2 запуск (стиль первых версий) ===")
 
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "saltv2"
@@ -60,8 +62,6 @@ CloseBtn.Size = UDim2.new(0,35,0,35)
 CloseBtn.Text = "X"
 CloseBtn.TextColor3 = Color3.fromRGB(255,80,80)
 CloseBtn.TextScaled = true
-local cc = Instance.new("UICorner", CloseBtn)
-cc.CornerRadius = UDim.new(0,8)
 
 -- Вкладки
 local TabFrame = Instance.new("Frame")
@@ -120,30 +120,31 @@ MiscPage.Size = UDim2.new(1,-20,1,-170)
 MiscPage.Visible = false
 
 -- Переключение вкладок
-DefenseTab.Activated:Connect(function()
+DefenseTab.MouseButton1Click:Connect(function()
     DefensePage.Visible = true
     AttackPage.Visible = false
     MiscPage.Visible = false
 end)
 
-AttackTab.Activated:Connect(function()
+AttackTab.MouseButton1Click:Connect(function()
     DefensePage.Visible = false
     AttackPage.Visible = true
     MiscPage.Visible = false
 end)
 
-MiscTab.Activated:Connect(function()
+MiscTab.MouseButton1Click:Connect(function()
     DefensePage.Visible = false
     AttackPage.Visible = false
     MiscPage.Visible = true
 end)
 
 -- Закрытие
-CloseBtn.Activated:Connect(function()
+CloseBtn.MouseButton1Click:Connect(function()
     MainFrame.Visible = false
+    print("Закрыто крестиком")
 end)
 
--- Defense
+-- Defense Page
 local AntiGrabBtn = Instance.new("TextButton", DefensePage)
 AntiGrabBtn.BackgroundColor3 = Color3.fromRGB(80,80,80)
 AntiGrabBtn.Position = UDim2.new(0.05,0,0.1,0)
@@ -160,7 +161,7 @@ BackTPBtn.Text = "Back TP on Grab: OFF"
 BackTPBtn.TextColor3 = Color3.fromRGB(200,200,200)
 BackTPBtn.TextScaled = true
 
--- Attack (sliders)
+-- Attack Page (ползунки)
 local ReachLabel = Instance.new("TextLabel", AttackPage)
 ReachLabel.BackgroundTransparency = 1
 ReachLabel.Position = UDim2.new(0.05,0,0.1,0)
@@ -212,17 +213,17 @@ local ThrowFill = Instance.new("Frame", ThrowSlider)
 ThrowFill.BackgroundColor3 = Color3.fromRGB(0,255,128)
 ThrowFill.Size = UDim2.new(0.5,0,1,0)
 
--- Misc
+-- Misc Page
 local PlayersScroll = Instance.new("ScrollingFrame", MiscPage)
 PlayersScroll.BackgroundColor3 = Color3.fromRGB(10,10,10)
 PlayersScroll.Position = UDim2.new(0.05,0,0.05,0)
-PlayersScroll.Size = UDim2.new(0.9,0,0.4,0)
+PlayersScroll.Size = UDim2.new(0.9,0,0.35,0)
 PlayersScroll.ScrollBarImageColor3 = Color3.fromRGB(0,255,128)
 PlayersScroll.CanvasSize = UDim2.new(0,0,0,0)
 
 local TPBtn = Instance.new("TextButton", MiscPage)
 TPBtn.BackgroundColor3 = Color3.fromRGB(0,255,128)
-TPBtn.Position = UDim2.new(0.05,0,0.5,0)
+TPBtn.Position = UDim2.new(0.05,0,0.45,0)
 TPBtn.Size = UDim2.new(0.9,0,0,50)
 TPBtn.Text = "TP to Selected"
 TPBtn.TextColor3 = Color3.new(0,0,0)
@@ -230,7 +231,7 @@ TPBtn.TextScaled = true
 
 local TrackBtn = Instance.new("TextButton", MiscPage)
 TrackBtn.BackgroundColor3 = Color3.fromRGB(80,80,80)
-TrackBtn.Position = UDim2.new(0.05,0,0.62,0)
+TrackBtn.Position = UDim2.new(0.05,0,0.57,0)
 TrackBtn.Size = UDim2.new(0.9,0,0,50)
 TrackBtn.Text = "Tracking: OFF"
 TrackBtn.TextColor3 = Color3.fromRGB(200,200,200)
@@ -238,7 +239,7 @@ TrackBtn.TextScaled = true
 
 local FlyBtn = Instance.new("TextButton", MiscPage)
 FlyBtn.BackgroundColor3 = Color3.fromRGB(80,80,80)
-FlyBtn.Position = UDim2.new(0.05,0,0.74,0)
+FlyBtn.Position = UDim2.new(0.05,0,0.69,0)
 FlyBtn.Size = UDim2.new(0.9,0,0,50)
 FlyBtn.Text = "Fly: OFF"
 FlyBtn.TextColor3 = Color3.fromRGB(200,200,200)
@@ -246,133 +247,58 @@ FlyBtn.TextScaled = true
 
 local NoclipBtn = Instance.new("TextButton", MiscPage)
 NoclipBtn.BackgroundColor3 = Color3.fromRGB(80,80,80)
-NoclipBtn.Position = UDim2.new(0.05,0,0.86,0)
+NoclipBtn.Position = UDim2.new(0.05,0,0.81,0)
 NoclipBtn.Size = UDim2.new(0.9,0,0,50)
 NoclipBtn.Text = "Noclip: OFF"
 NoclipBtn.TextColor3 = Color3.fromRGB(200,200,200)
 NoclipBtn.TextScaled = true
 
--- Слайдеры (Reach, Pull, Throw)
-local dragging = {false, false, false}
+-- Слайдеры (простая реализация)
+local draggingReach = false
+ReachSlider.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then draggingReach = true end
+end)
 
-local function sliderLogic(track, fill, label, min, max, varName)
-    track.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
-            dragging[varName] = true
-        end
-    end)
-end
+local draggingPull = false
+PullSlider.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then draggingPull = true end
+end)
+
+local draggingThrow = false
+ThrowSlider.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then draggingThrow = true end
+end)
 
 UIS.InputEnded:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        dragging = {false, false, false}
+        draggingReach = false
+        draggingPull = false
+        draggingThrow = false
     end
 end)
 
 RS.RenderStepped:Connect(function()
-    if dragging[1] then
-        local rel = math.clamp((Mouse.X - SliderTrackReach.AbsolutePosition.X) / SliderTrackReach.AbsoluteSize.X, 0, 1)
-        SliderFillReach.Size = UDim2.new(rel,0,1,0)
+    if draggingReach then
+        local rel = math.clamp((Mouse.X - ReachSlider.AbsolutePosition.X) / ReachSlider.AbsoluteSize.X, 0, 1)
+        ReachFill.Size = UDim2.new(rel,0,1,0)
         grabReach = math.floor(50 + 950 * rel)
         ReachLabel.Text = "Grab Reach: " .. grabReach
     end
-    if dragging[2] then
-        local rel = math.clamp((Mouse.X - SliderTrackPull.AbsolutePosition.X) / SliderTrackPull.AbsoluteSize.X, 0, 1)
-        SliderFillPull.Size = UDim2.new(rel,0,1,0)
+    if draggingPull then
+        local rel = math.clamp((Mouse.X - PullSlider.AbsolutePosition.X) / PullSlider.AbsoluteSize.X, 0, 1)
+        PullFill.Size = UDim2.new(rel,0,1,0)
         pullStrength = math.floor(5 + 95 * rel)
         PullLabel.Text = "Pull Strength: " .. pullStrength
     end
-    if dragging[3] then
-        local rel = math.clamp((Mouse.X - SliderTrackThrow.AbsolutePosition.X) / SliderTrackThrow.AbsoluteSize.X, 0, 1)
-        SliderFillThrow.Size = UDim2.new(rel,0,1,0)
+    if draggingThrow then
+        local rel = math.clamp((Mouse.X - ThrowSlider.AbsolutePosition.X) / ThrowSlider.AbsoluteSize.X, 0, 1)
+        ThrowFill.Size = UDim2.new(rel,0,1,0)
         throwStrength = math.floor(500 + 4500 * rel)
         ThrowLabel.Text = "Throw Strength (RMB): " .. throwStrength
     end
 end)
 
-sliderLogic(SliderTrackReach, SliderFillReach, ReachLabel, 50, 1000, 1)
-sliderLogic(SliderTrackPull, SliderFillPull, PullLabel, 5, 100, 2)
-sliderLogic(SliderTrackThrow, SliderFillThrow, ThrowLabel, 500, 5000, 3)
-
--- Кнопки Defense
-AntiGrabBtn.Activated:Connect(function()
-    antiGrab = not antiGrab
-    AntiGrabBtn.BackgroundColor3 = antiGrab and Color3.fromRGB(0,255,128) or Color3.fromRGB(80,80,80)
-    AntiGrabBtn.Text = "Anti-Grab: " .. (antiGrab and "ON" or "OFF")
-end)
-
-BackTPBtn.Activated:Connect(function()
-    backTP = not backTP
-    BackTPBtn.BackgroundColor3 = backTP and Color3.fromRGB(0,255,128) or Color3.fromRGB(80,80,80)
-    BackTPBtn.Text = "Back TP on Grab: " .. (backTP and "ON" or "OFF")
-end)
-
--- Кнопки Misc
-TPBtn.Activated:Connect(function()
-    if selectedTarget and selectedTarget.Character then
-        local hrp = Player.Character and Player.Character:FindFirstChild("HumanoidRootPart")
-        if hrp then hrp.CFrame = selectedTarget.Character.HumanoidRootPart.CFrame * CFrame.new(0,0,-6) end
-    end
-end)
-
-TrackBtn.Activated:Connect(function()
-    tracking = not tracking
-    TrackBtn.BackgroundColor3 = tracking and Color3.fromRGB(0,255,128) or Color3.fromRGB(80,80,80)
-    TrackBtn.Text = "Tracking: " .. (tracking and "ON" or "OFF")
-end)
-
-FlyBtn.Activated:Connect(function()
-    flying = not flying
-    local root = Player.Character and Player.Character:FindFirstChild("HumanoidRootPart")
-    if root then
-        if flying then
-            bodyVelocity = Instance.new("BodyVelocity", root)
-            bodyVelocity.MaxForce = Vector3.new(1e5,1e5,1e5)
-            bodyVelocity.Velocity = Vector3.new()
-            bodyGyro = Instance.new("BodyGyro", root)
-            bodyGyro.MaxTorque = Vector3.new(1e5,1e5,1e5)
-            spawn(function()
-                while flying do
-                    local cam = WS.CurrentCamera
-                    local move = Vector3.new()
-                    if UIS:IsKeyDown(Enum.KeyCode.W) then move = move + cam.CFrame.LookVector end
-                    if UIS:IsKeyDown(Enum.KeyCode.S) then move = move - cam.CFrame.LookVector end
-                    if UIS:IsKeyDown(Enum.KeyCode.A) then move = move - cam.CFrame.RightVector end
-                    if UIS:IsKeyDown(Enum.KeyCode.D) then move = move + cam.CFrame.RightVector end
-                    if UIS:IsKeyDown(Enum.KeyCode.Space) then move = move + Vector3.new(0,1,0) end
-                    if UIS:IsKeyDown(Enum.KeyCode.LeftControl) then move = move - Vector3.new(0,1,0) end
-                    bodyVelocity.Velocity = move * 80
-                    bodyGyro.CFrame = cam.CFrame
-                    RS.Heartbeat:Wait()
-                end
-            end)
-        else
-            if bodyVelocity then bodyVelocity:Destroy() end
-            if bodyGyro then bodyGyro:Destroy() end
-        end
-    end
-    FlyBtn.BackgroundColor3 = flying and Color3.fromRGB(0,255,128) or Color3.fromRGB(80,80,80)
-    FlyBtn.Text = "Fly: " .. (flying and "ON" or "OFF")
-end)
-
-NoclipBtn.Activated:Connect(function()
-    noclipping = not noclipping
-    if noclipConn then noclipConn:Disconnect() end
-    if noclipping then
-        noclipConn = RS.Stepped:Connect(function()
-            local char = Player.Character
-            if char then
-                for _, part in pairs(char:GetDescendants()) do
-                    if part:IsA("BasePart") then part.CanCollide = false end
-                end
-            end
-        end)
-    end
-    NoclipBtn.BackgroundColor3 = noclipping and Color3.fromRGB(0,255,128) or Color3.fromRGB(80,80,80)
-    NoclipBtn.Text = "Noclip: " .. (noclipping and "ON" or "OFF")
-end)
-
--- Авто-обновление списка игроков
+-- Обновление списка игроков в Misc
 spawn(function()
     while true do
         wait(5)
@@ -388,9 +314,9 @@ spawn(function()
                 btn.Text = p.Name
                 btn.TextColor3 = Color3.fromRGB(255,255,255)
                 btn.TextScaled = true
-                btn.Activated:Connect(function()
+                btn.MouseButton1Click:Connect(function()
                     selectedTarget = p
-                    updatePlayers(PlayersScroll)
+                    updatePlayers(PlayersScroll)  -- обновляем подсветку
                 end)
                 y = y + 35
             end
@@ -399,30 +325,54 @@ spawn(function()
     end
 end)
 
--- TP на Z
-UIS.InputBegan:Connect(function(input)
-    if input.KeyCode == tpKey then
-        if selectedTarget and selectedTarget.Character then
-            local hrp = Player.Character and Player.Character.HumanoidRootPart
-            if hrp then hrp.CFrame = selectedTarget.Character.HumanoidRootPart.CFrame * CFrame.new(0,0,-6) end
-        end
-    end
-end)
-
--- Tracking
-spawn(function()
-    while true do
-        wait(0.05)
-        if tracking and selectedTarget and selectedTarget.Character then
-            local hrp = Player.Character and Player.Character.HumanoidRootPart
-            if hrp then
-                hrp.CFrame = selectedTarget.Character.HumanoidRootPart.CFrame * CFrame.new(0,0,-5)
+-- Функции Fly и Noclip
+local function toggleFly(state)
+    flying = state
+    local root = Player.Character and Player.Character:FindFirstChild("HumanoidRootPart")
+    if not root then return end
+    if flying then
+        bodyVelocity = Instance.new("BodyVelocity", root)
+        bodyVelocity.MaxForce = Vector3.new(1e5,1e5,1e5)
+        bodyVelocity.Velocity = Vector3.new()
+        bodyGyro = Instance.new("BodyGyro", root)
+        bodyGyro.MaxTorque = Vector3.new(1e5,1e5,1e5)
+        spawn(function()
+            while flying do
+                local cam = WS.CurrentCamera
+                local move = Vector3.new()
+                if UIS:IsKeyDown(Enum.KeyCode.W) then move = move + cam.CFrame.LookVector end
+                if UIS:IsKeyDown(Enum.KeyCode.S) then move = move - cam.CFrame.LookVector end
+                if UIS:IsKeyDown(Enum.KeyCode.A) then move = move - cam.CFrame.RightVector end
+                if UIS:IsKeyDown(Enum.KeyCode.D) then move = move + cam.CFrame.RightVector end
+                if UIS:IsKeyDown(Enum.KeyCode.Space) then move = move + Vector3.new(0,1,0) end
+                if UIS:IsKeyDown(Enum.KeyCode.LeftControl) then move = move - Vector3.new(0,1,0) end
+                bodyVelocity.Velocity = move * 80
+                bodyGyro.CFrame = cam.CFrame
+                RS.Heartbeat:Wait()
             end
-        end
+        end)
+    else
+        if bodyVelocity then bodyVelocity:Destroy() end
+        if bodyGyro then bodyGyro:Destroy() end
     end
-end)
+end
 
--- Anti-Grab и Back TP
+local function toggleNoclip(state)
+    noclipping = state
+    if noclipConn then noclipConn:Disconnect() end
+    if noclipping then
+        noclipConn = RS.Stepped:Connect(function()
+            local char = Player.Character
+            if char then
+                for _, part in pairs(char:GetDescendants()) do
+                    if part:IsA("BasePart") then part.CanCollide = false end
+                end
+            end
+        end)
+    end
+end
+
+-- Defense и Back TP логика
 spawn(function()
     while true do
         wait(0.1)
@@ -447,4 +397,30 @@ spawn(function()
     end
 end)
 
-print("salt v2 - меню должно появиться")
+-- Tracking
+spawn(function()
+    while true do
+        wait(0.05)
+        if tracking and selectedTarget and selectedTarget.Character then
+            local hrp = Player.Character and Player.Character.HumanoidRootPart
+            if hrp then
+                hrp.CFrame = selectedTarget.Character.HumanoidRootPart.CFrame * CFrame.new(0,0,-5)
+            end
+        end
+    end
+end)
+
+-- TP на Z
+UIS.InputBegan:Connect(function(input)
+    if input.KeyCode == tpKey then
+        if selectedTarget and selectedTarget.Character then
+            local hrp = Player.Character and Player.Character.HumanoidRootPart
+            if hrp then
+                hrp.CFrame = selectedTarget.Character.HumanoidRootPart.CFrame * CFrame.new(0,0,-6)
+            end
+        end
+    end
+end)
+
+print("=== salt v2 меню должно работать ===")
+print("Если кнопки всё равно не кликаются — попробуй другой executor или обнови текущий")
