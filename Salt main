@@ -8,286 +8,275 @@ local Debris = game:GetService("Debris")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Player = Players.LocalPlayer
+local Mouse = Player:GetMouse()
+local flying = false
+local noclipping = true
+local bodyVelocity, bodyGyro, noclipConn
+
+-- Список популярных игрушек (2026 актуально)
+local TOY_NAMES = {
+    "Missile", "Blobman", "Kunai", "Shuriken", "Smoke Bomb", "Unstable Substance",
+    "Snowball", "Balloon", "Toy Frog", "Toy Tiger", "Toy Duck", "Toy Unicorn",
+    "Toy Bear", "Little Helicopter", "Little Plane", "Little UFO", "Sparkler",
+    "Campfire", "Bubble Blower", "Pickaxe", "Bomb"
+}
+
+local selectedTarget = nil
+local selectedToyName = nil  -- имя игрушки
+local powerValue = 500
 
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "saltv2"
 ScreenGui.ResetOnSpawn = false
-ScreenGui.Enabled = true
 ScreenGui.DisplayOrder = 9999
 ScreenGui.IgnoreGuiInset = true
-ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 ScreenGui.Parent = Player:WaitForChild("PlayerGui")
 
 local MainFrame = Instance.new("Frame")
 MainFrame.Name = "Main"
 MainFrame.Parent = ScreenGui
-MainFrame.BackgroundColor3 = Color3.new(0, 0, 0)
-MainFrame.BorderSizePixel = 0
+MainFrame.BackgroundColor3 = Color3.new(0,0,0)
 MainFrame.Position = UDim2.new(0.5, -250, 0.5, -200)
 MainFrame.Size = UDim2.new(0, 500, 0, 400)
-MainFrame.Visible = true  -- для теста сразу видно, потом можно на Insert
-MainFrame.ZIndex = 10
+MainFrame.Visible = true  -- для теста; потом на Insert
 MainFrame.Active = true
-MainFrame.Draggable = true  -- теперь можно таскать мышкой
+MainFrame.Draggable = true
 
-local UICorner = Instance.new("UICorner")
-UICorner.CornerRadius = UDim.new(0, 12)
-UICorner.Parent = MainFrame
+local UICorner = Instance.new("UICorner", MainFrame); UICorner.CornerRadius = UDim.new(0,12)
 
 local Title = Instance.new("TextLabel")
 Title.Parent = MainFrame
 Title.BackgroundTransparency = 1
-Title.Size = UDim2.new(1, 0, 0, 50)
+Title.Size = UDim2.new(1,0,0,50)
 Title.Font = Enum.Font.GothamBold
 Title.Text = "salt v2"
-Title.TextColor3 = Color3.fromRGB(0, 255, 128)  -- салатовый
+Title.TextColor3 = Color3.fromRGB(0,255,128)
 Title.TextScaled = true
 
 local CloseBtn = Instance.new("TextButton")
 CloseBtn.Parent = MainFrame
-CloseBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-CloseBtn.Position = UDim2.new(1, -45, 0, 8)
-CloseBtn.Size = UDim2.new(0, 35, 0, 35)
-CloseBtn.Font = Enum.Font.GothamBold
+CloseBtn.BackgroundColor3 = Color3.fromRGB(40,40,40)
+CloseBtn.Position = UDim2.new(1,-45,0,8)
+CloseBtn.Size = UDim2.new(0,35,0,35)
 CloseBtn.Text = "X"
-CloseBtn.TextColor3 = Color3.fromRGB(255, 80, 80)
+CloseBtn.TextColor3 = Color3.fromRGB(255,80,80)
 CloseBtn.TextScaled = true
-local CloseCorner = Instance.new("UICorner", CloseBtn)
-CloseCorner.CornerRadius = UDim.new(0, 8)
+local cc = Instance.new("UICorner", CloseBtn); cc.CornerRadius = UDim.new(0,8)
 
--- Targets (левая часть)
-local TargetsLabel = Instance.new("TextLabel")
-TargetsLabel.Parent = MainFrame
-TargetsLabel.BackgroundTransparency = 1
-TargetsLabel.Position = UDim2.new(0, 15, 0, 60)
-TargetsLabel.Size = UDim2.new(0.48, -20, 0, 25)
-TargetsLabel.Font = Enum.Font.GothamSemibold
-TargetsLabel.Text = "Цели"
-TargetsLabel.TextColor3 = Color3.fromRGB(0, 255, 128)
-TargetsLabel.TextScaled = true
-TargetsLabel.TextXAlignment = Enum.TextXAlignment.Left
-
+-- Targets
 local TargetsScroll = Instance.new("ScrollingFrame")
 TargetsScroll.Parent = MainFrame
-TargetsScroll.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
-TargetsScroll.BorderSizePixel = 0
-TargetsScroll.Position = UDim2.new(0, 15, 0, 90)
-TargetsScroll.Size = UDim2.new(0.48, -30, 0, 150)
-TargetsScroll.ScrollBarThickness = 5
-TargetsScroll.ScrollBarImageColor3 = Color3.fromRGB(0, 255, 128)
-TargetsScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
-local TargetsCorner = Instance.new("UICorner", TargetsScroll)
-TargetsCorner.CornerRadius = UDim.new(0, 8)
+TargetsScroll.BackgroundColor3 = Color3.fromRGB(10,10,10)
+TargetsScroll.Position = UDim2.new(0.02,0,0.15,0)
+TargetsScroll.Size = UDim2.new(0.46,0,0.4,0)
+TargetsScroll.ScrollBarImageColor3 = Color3.fromRGB(0,255,128)
+TargetsScroll.CanvasSize = UDim2.new(0,0,0,0)
 
--- Tools (правая часть)
-local ToolsLabel = Instance.new("TextLabel")
-ToolsLabel.Parent = MainFrame
-ToolsLabel.BackgroundTransparency = 1
-ToolsLabel.Position = UDim2.new(0.52, 0, 0, 60)
-ToolsLabel.Size = UDim2.new(0.48, -15, 0, 25)
-ToolsLabel.Font = Enum.Font.GothamSemibold
-ToolsLabel.Text = "Игрушки"
-ToolsLabel.TextColor3 = Color3.fromRGB(0, 255, 128)
-ToolsLabel.TextScaled = true
-ToolsLabel.TextXAlignment = Enum.TextXAlignment.Left
+-- Toys
+local ToysScroll = Instance.new("ScrollingFrame")
+ToysScroll.Parent = MainFrame
+ToysScroll.BackgroundColor3 = Color3.fromRGB(10,10,10)
+ToysScroll.Position = UDim2.new(0.52,0,0.15,0)
+ToysScroll.Size = UDim2.new(0.46,0,0.4,0)
+ToysScroll.ScrollBarImageColor3 = Color3.fromRGB(0,255,128)
+ToysScroll.CanvasSize = UDim2.new(0,0,0,0)
 
-local ToolsScroll = Instance.new("ScrollingFrame")
-ToolsScroll.Parent = MainFrame
-ToolsScroll.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
-ToolsScroll.BorderSizePixel = 0
-ToolsScroll.Position = UDim2.new(0.52, 0, 0, 90)
-ToolsScroll.Size = UDim2.new(0.48, -15, 0, 150)
-ToolsScroll.ScrollBarThickness = 5
-ToolsScroll.ScrollBarImageColor3 = Color3.fromRGB(0, 255, 128)
-ToolsScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
-local ToolsCorner = Instance.new("UICorner", ToolsScroll)
-ToolsCorner.CornerRadius = UDim.new(0, 8)
-
--- Power slider
+-- Power
 local PowerLabel = Instance.new("TextLabel")
 PowerLabel.Parent = MainFrame
 PowerLabel.BackgroundTransparency = 1
-PowerLabel.Position = UDim2.new(0.05, 0, 0.68, 0)
-PowerLabel.Size = UDim2.new(0.9, 0, 0, 25)
-PowerLabel.Font = Enum.Font.GothamSemibold
+PowerLabel.Position = UDim2.new(0.05,0,0.62,0)
+PowerLabel.Size = UDim2.new(0.9,0,0,30)
 PowerLabel.Text = "Power: 500"
-PowerLabel.TextColor3 = Color3.fromRGB(0, 255, 128)
+PowerLabel.TextColor3 = Color3.fromRGB(0,255,128)
 PowerLabel.TextScaled = true
 
 local SliderTrack = Instance.new("Frame")
 SliderTrack.Parent = MainFrame
-SliderTrack.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-SliderTrack.Position = UDim2.new(0.05, 0, 0.75, 0)
-SliderTrack.Size = UDim2.new(0.9, 0, 0, 20)
-local TrackCorner = Instance.new("UICorner", SliderTrack)
-TrackCorner.CornerRadius = UDim.new(0, 10)
+SliderTrack.BackgroundColor3 = Color3.fromRGB(30,30,30)
+SliderTrack.Position = UDim2.new(0.05,0,0.7,0)
+SliderTrack.Size = UDim2.new(0.9,0,0,20)
 
 local SliderFill = Instance.new("Frame")
 SliderFill.Parent = SliderTrack
-SliderFill.BackgroundColor3 = Color3.fromRGB(0, 255, 128)
-SliderFill.BorderSizePixel = 0
-SliderFill.Size = UDim2.new(0.5, 0, 1, 0)
-local FillCorner = Instance.new("UICorner", SliderFill)
-FillCorner.CornerRadius = UDim.new(0, 10)
+SliderFill.BackgroundColor3 = Color3.fromRGB(0,255,128)
+SliderFill.Size = UDim2.new(0.1,0,1,0)
 
 local ActivateBtn = Instance.new("TextButton")
 ActivateBtn.Parent = MainFrame
-ActivateBtn.BackgroundColor3 = Color3.fromRGB(0, 255, 128)
-ActivateBtn.BorderSizePixel = 0
-ActivateBtn.Position = UDim2.new(0.1, 0, 0.85, 0)
-ActivateBtn.Size = UDim2.new(0.8, 0, 0, 45)
-ActivateBtn.Font = Enum.Font.GothamBold
-ActivateBtn.Text = "АКТИВАТИРОВАТЬ"
+ActivateBtn.BackgroundColor3 = Color3.fromRGB(0,255,128)
+ActivateBtn.Position = UDim2.new(0.1,0,0.82,0)
+ActivateBtn.Size = UDim2.new(0.8,0,0,50)
+ActivateBtn.Text = "АКТИВАТИРОВАТЬ (ТП + СПАВН)"
 ActivateBtn.TextColor3 = Color3.new(0,0,0)
 ActivateBtn.TextScaled = true
-local ActCorner = Instance.new("UICorner", ActivateBtn)
-ActCorner.CornerRadius = UDim.new(0, 12)
 
-local selectedTarget = nil
-local selectedTool = nil
-local powerValue = 500
-
-local function updateTargets()
-    for _, child in pairs(TargetsScroll:GetChildren()) do
-        if child:IsA("TextButton") then child:Destroy() end
+-- Fly + Noclip
+local function toggleFly()
+    local char = Player.Character
+    local root = char and char.HumanoidRootPart
+    if not root then return end
+    flying = not flying
+    if flying then
+        bodyVelocity = Instance.new("BodyVelocity", root)
+        bodyVelocity.MaxForce = Vector3.new(1e5,1e5,1e5)
+        bodyVelocity.Velocity = Vector3.new()
+        bodyGyro = Instance.new("BodyGyro", root)
+        bodyGyro.MaxTorque = Vector3.new(1e5,1e5,1e5)
+        spawn(function()
+            while flying do
+                local cam = WS.CurrentCamera
+                local move = Vector3.new()
+                if UIS:IsKeyDown(Enum.KeyCode.W) then move += cam.CFrame.LookVector end
+                if UIS:IsKeyDown(Enum.KeyCode.S) then move -= cam.CFrame.LookVector end
+                if UIS:IsKeyDown(Enum.KeyCode.A) then move -= cam.CFrame.RightVector end
+                if UIS:IsKeyDown(Enum.KeyCode.D) then move += cam.CFrame.RightVector end
+                if UIS:IsKeyDown(Enum.KeyCode.Space) then move += Vector3.new(0,1,0) end
+                if UIS:IsKeyDown(Enum.KeyCode.LeftControl) then move -= Vector3.new(0,1,0) end
+                bodyVelocity.Velocity = move * 80
+                bodyGyro.CFrame = cam.CFrame
+                RS.Heartbeat:Wait()
+            end
+        end)
+    else
+        if bodyVelocity then bodyVelocity:Destroy() end
+        if bodyGyro then bodyGyro:Destroy() end
     end
+end
+
+-- Super Throw на RMB
+local superStrength = 1500  -- сила броска (можно менять)
+WS.ChildAdded:Connect(function(child)
+    if child.Name == "GrabParts" then
+        local grabPart = child:FindFirstChild("GrabPart")
+        if grabPart then
+            local weld = grabPart:FindFirstChildOfClass("WeldConstraint")
+            if weld and weld.Part1 then
+                local grabbed = weld.Part1
+                local bv
+                child.AncestryChanged:Connect(function()
+                    if not child.Parent then  -- отпустили
+                        if UIS:GetLastInputType() == Enum.UserInputType.MouseButton2 then
+                            bv = Instance.new("BodyVelocity", grabbed)
+                            bv.MaxForce = Vector3.new(1e9,1e9,1e9)
+                            bv.Velocity = WS.CurrentCamera.CFrame.LookVector * superStrength + Vector3.new(0,300,0)
+                            Debris:AddItem(bv, 0.5)
+                        end
+                    end
+                end)
+            end
+        end
+    end
+end)
+
+-- Update lists
+local function updatePlayers()
+    for _, b in pairs(TargetsScroll:GetChildren()) do if b:IsA("TextButton") then b:Destroy() end end
     local y = 0
     for _, p in pairs(Players:GetPlayers()) do
-        if p ~= Player and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+        if p ~= Player and p.Character then
             local btn = Instance.new("TextButton")
             btn.Parent = TargetsScroll
-            btn.BackgroundColor3 = (selectedTarget == p) and Color3.fromRGB(0, 100, 50) or Color3.fromRGB(20, 20, 20)
-            btn.Size = UDim2.new(1, -10, 0, 30)
-            btn.Position = UDim2.new(0, 5, 0, y)
-            btn.Font = Enum.Font.Gotham
+            btn.BackgroundColor3 = (selectedTarget == p) and Color3.fromRGB(0,100,50) or Color3.fromRGB(20,20,20)
+            btn.Size = UDim2.new(1,-10,0,30)
+            btn.Position = UDim2.new(0,5,0,y)
             btn.Text = p.Name
-            btn.TextColor3 = Color3.fromRGB(220, 220, 220)
+            btn.TextColor3 = Color3.fromRGB(255,255,255)
             btn.TextScaled = true
-            local c = Instance.new("UICorner", btn)
-            c.CornerRadius = UDim.new(0, 6)
             btn.MouseButton1Click:Connect(function()
                 selectedTarget = p
-                updateTargets()  -- перерисовываем, чтобы подсветить новую
+                updatePlayers()
             end)
             y = y + 35
         end
     end
-    TargetsScroll.CanvasSize = UDim2.new(0, 0, 0, y)
+    TargetsScroll.CanvasSize = UDim2.new(0,0,0,y)
 end
 
-local function updateTools()
-    for _, child in pairs(ToolsScroll:GetChildren()) do
-        if child:IsA("TextButton") then child:Destroy() end
-    end
-    local toolsFolder = ReplicatedStorage:FindFirstChild("Tools") or ReplicatedStorage:FindFirstChild("MenuToys") or ReplicatedStorage:FindFirstChild("ToyShop")
+local function updateToys()
+    for _, b in pairs(ToysScroll:GetChildren()) do if b:IsA("TextButton") then b:Destroy() end end
     local y = 0
-    if toolsFolder then
-        for _, item in pairs(toolsFolder:GetChildren()) do
-            if item:IsA("Tool") or item:IsA("Model") then
-                local btn = Instance.new("TextButton")
-                btn.Parent = ToolsScroll
-                btn.BackgroundColor3 = (selectedTool == item) and Color3.fromRGB(0, 100, 50) or Color3.fromRGB(20, 20, 20)
-                btn.Size = UDim2.new(1, -10, 0, 30)
-                btn.Position = UDim2.new(0, 5, 0, y)
-                btn.Font = Enum.Font.Gotham
-                btn.Text = item.Name
-                btn.TextColor3 = Color3.fromRGB(220, 220, 220)
-                btn.TextScaled = true
-                local c = Instance.new("UICorner", btn)
-                c.CornerRadius = UDim.new(0, 6)
-                btn.MouseButton1Click:Connect(function()
-                    selectedTool = item
-                    updateTools()
-                end)
-                y = y + 35
-            end
-        end
-    else
-        local lbl = Instance.new("TextLabel")
-        lbl.Parent = ToolsScroll
-        lbl.BackgroundTransparency = 1
-        lbl.Size = UDim2.new(1, 0, 0, 30)
-        lbl.Text = "Tools не найдены"
-        lbl.TextColor3 = Color3.fromRGB(150, 150, 150)
-        lbl.TextScaled = true
+    for _, name in pairs(TOY_NAMES) do
+        local btn = Instance.new("TextButton")
+        btn.Parent = ToysScroll
+        btn.BackgroundColor3 = (selectedToyName == name) and Color3.fromRGB(0,100,50) or Color3.fromRGB(20,20,20)
+        btn.Size = UDim2.new(1,-10,0,30)
+        btn.Position = UDim2.new(0,5,0,y)
+        btn.Text = name
+        btn.TextColor3 = Color3.fromRGB(255,255,255)
+        btn.TextScaled = true
+        btn.MouseButton1Click:Connect(function()
+            selectedToyName = name
+            updateToys()
+        end)
+        y = y + 35
     end
-    ToolsScroll.CanvasSize = UDim2.new(0, 0, 0, y)
+    ToysScroll.CanvasSize = UDim2.new(0,0,0,y)
 end
 
--- Power drag
+-- Power slider
 local dragging = false
-SliderTrack.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        dragging = true
-    end
-end)
-UIS.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        dragging = false
-    end
-end)
+SliderTrack.InputBegan:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 then dragging = true end end)
+UIS.InputEnded:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end end)
 RS.RenderStepped:Connect(function()
     if dragging then
-        local mousePos = UIS:GetMouseLocation()
-        local trackAbs = SliderTrack.AbsolutePosition
-        local trackSize = SliderTrack.AbsoluteSize
-        local rel = math.clamp((mousePos.X - trackAbs.X) / trackSize.X, 0, 1)
-        SliderFill.Size = UDim2.new(rel, 0, 1, 0)
-        powerValue = math.floor(100 + (4900 * rel))
+        local rel = math.clamp((Mouse.X - SliderTrack.AbsolutePosition.X) / SliderTrack.AbsoluteSize.X, 0, 1)
+        SliderFill.Size = UDim2.new(rel,0,1,0)
+        powerValue = math.floor(100 + 4900 * rel)
         PowerLabel.Text = "Power: " .. powerValue
     end
 end)
 
-local function activate()
-    if not selectedTarget or not selectedTarget.Character then return end
-    if not selectedTool then return end
-    
+-- Activate
+ActivateBtn.MouseButton1Click:Connect(function()
+    if not selectedTarget or not selectedToyName then return end
     local hrp = Player.Character and Player.Character:FindFirstChild("HumanoidRootPart")
-    if hrp then
-        hrp.CFrame = selectedTarget.Character.HumanoidRootPart.CFrame * CFrame.new(0, 0, -6)
-    end
+    if hrp then hrp.CFrame = selectedTarget.Character.HumanoidRootPart.CFrame * CFrame.new(0,0,-6) end
     
-    local targetPos = selectedTarget.Character.HumanoidRootPart.Position
-    for i = 1, 5 do
-        local clone = selectedTool:Clone()
-        clone.Parent = WS
-        local part = clone.PrimaryPart or clone:FindFirstChildWhichIsA("BasePart")
-        if part then
-            part.CFrame = CFrame.new(targetPos + Vector3.new(math.random(-10,10), 10, math.random(-10,10)))
-            local bv = Instance.new("BodyVelocity")
-            bv.Velocity = WS.CurrentCamera.CFrame.LookVector * powerValue + Vector3.new(0, powerValue / 2, 0)
-            bv.MaxForce = Vector3.new(1e6, 1e6, 1e6)
-            bv.Parent = part
-            Debris:AddItem(bv, 1.5)
-            Debris:AddItem(clone, 6)
-        end
-    end
-end
-
-ActivateBtn.MouseButton1Click:Connect(activate)
-CloseBtn.MouseButton1Click:Connect(function() MainFrame.Visible = false end)
-
-UIS.InputBegan:Connect(function(input)
-    if input.KeyCode == Enum.KeyCode.Insert then
-        MainFrame.Visible = not MainFrame.Visible
-        if MainFrame.Visible then
-            updateTargets()
-            updateTools()
+    local pos = selectedTarget.Character.HumanoidRootPart.Position
+    for i=1,5 do
+        local toy = ReplicatedStorage:FindFirstChild(selectedToyName,true) or WS:FindFirstChild(selectedToyName,true)
+        if toy then
+            local clone = toy:Clone()
+            clone.Parent = WS
+            local part = clone.PrimaryPart or clone:FindFirstChildWhichIsA("BasePart")
+            if part then
+                part.CFrame = CFrame.new(pos + Vector3.new(math.random(-5,5),10,math.random(-5,5)))
+                local bv = Instance.new("BodyVelocity", part)
+                bv.Velocity = WS.CurrentCamera.CFrame.LookVector * powerValue + Vector3.new(0, powerValue*0.4, 0)
+                bv.MaxForce = Vector3.new(1e6,1e6,1e6)
+                Debris:AddItem(bv,2)
+                Debris:AddItem(clone,8)
+            end
         end
     end
 end)
 
--- Авто-обновление каждые 4 секунды, если меню открыто
+-- Binds
+UIS.InputBegan:Connect(function(input)
+    local kc = input.KeyCode
+    if kc == Enum.KeyCode.F then toggleFly() end
+    if kc == Enum.KeyCode.X then
+        noclipping = not noclipping
+        if noclipConn then noclipConn:Disconnect() end
+        if noclipping then
+            noclipConn = RS.Stepped:Connect(function()
+                local char = Player.Character
+                if char then for _,p in pairs(char:GetDescendants()) do if p:IsA("BasePart") then p.CanCollide = false end end end
+            end)
+        end
+    end
+    if kc == Enum.KeyCode.Insert then MainFrame.Visible = not MainFrame.Visible end
+end)
+
+-- Auto update
 spawn(function()
     while true do
         wait(4)
-        if MainFrame.Visible then
-            updateTargets()
-            updateTools()
-        end
+        if MainFrame.Visible then updatePlayers() end
     end
 end)
 
--- Инит
-updateTargets()
-updateTools()
+updatePlayers()
+updateToys()
+noclipping = true  -- noclip по умолчанию
