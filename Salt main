@@ -1,80 +1,359 @@
 -- salt v2
 
-local success, err = pcall(function()
-    wait(2)
-    
-    local Players = game:GetService("Players")
-    local Player = Players.LocalPlayer or Players.PlayerAdded:Wait()
-    
-    local PlayerGui = Player:WaitForChild("PlayerGui", 15)
-    if not PlayerGui then return end
-    
-    local ScreenGui = Instance.new("ScreenGui")
-    ScreenGui.Name = "saltv2"
-    ScreenGui.ResetOnSpawn = false
-    ScreenGui.Enabled = true
-    ScreenGui.DisplayOrder = 9999
-    ScreenGui.IgnoreGuiInset = true
-    ScreenGui.Parent = PlayerGui
-    
-    local MainFrame = Instance.new("Frame")
-    MainFrame.Name = "Main"
-    MainFrame.Parent = ScreenGui
-    MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 30)
-    MainFrame.BorderSizePixel = 0
-    MainFrame.Position = UDim2.new(0.5, -200, 0.5, -150)
-    MainFrame.Size = UDim2.new(0, 400, 0, 300)
-    MainFrame.Visible = true
-    
-    local UICorner = Instance.new("UICorner")
-    UICorner.CornerRadius = UDim.new(0, 16)
-    UICorner.Parent = MainFrame
-    
-    local Title = Instance.new("TextLabel")
-    Title.Parent = MainFrame
-    Title.BackgroundTransparency = 1
-    Title.Size = UDim2.new(1, 0, 0, 50)
-    Title.Font = Enum.Font.GothamBlack
-    Title.Text = "salt v2"
-    Title.TextColor3 = Color3.fromRGB(0, 255, 200)
-    Title.TextScaled = true
-    Title.TextStrokeTransparency = 0.8
-    
-    local Status = Instance.new("TextLabel")
-    Status.Parent = MainFrame
-    Status.BackgroundTransparency = 1
-    Status.Position = UDim2.new(0, 10, 0, 60)
-    Status.Size = UDim2.new(1, -20, 0, 200)
-    Status.Font = Enum.Font.SourceSansBold
-    Status.Text = "GUI загружено\n\nВыбери цель, игрушку и power\n\n(пока тестовая версия)"
-    Status.TextColor3 = Color3.fromRGB(255, 255, 255)
-    Status.TextScaled = true
-    Status.TextWrapped = true
-    Status.TextXAlignment = Enum.TextXAlignment.Left
-    
-    local Close = Instance.new("TextButton")
-    Close.Parent = MainFrame
-    Close.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
-    Close.Position = UDim2.new(1, -45, 0, 5)
-    Close.Size = UDim2.new(0, 40, 0, 40)
-    Close.Font = Enum.Font.GothamBold
-    Close.Text = "X"
-    Close.TextColor3 = Color3.fromRGB(255, 255, 255)
-    Close.TextScaled = true
-    local CloseCorner = Instance.new("UICorner", Close)
-    CloseCorner.CornerRadius = UDim.new(0, 8)
-    
-    Close.MouseButton1Click:Connect(function()
-        MainFrame.Visible = false
-    end)
-    
+local Players = game:GetService("Players")
+local UIS = game:GetService("UserInputService")
+local RS = game:GetService("RunService")
+local WS = game:GetService("Workspace")
+local Debris = game:GetService("Debris")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Player = Players.LocalPlayer
+local flying = false
+local noclipping = true
+local autoGrabAura = false
+local bodyVelocity, bodyGyro, noclipConn, grabLoop
+
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "saltv2"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.Enabled = true
+ScreenGui.DisplayOrder = 9999
+ScreenGui.IgnoreGuiInset = true
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+ScreenGui.Parent = Player:WaitForChild("PlayerGui")
+
+local MainFrame = Instance.new("Frame")
+MainFrame.Name = "Main"
+MainFrame.Parent = ScreenGui
+MainFrame.BackgroundColor3 = Color3.new(0,0,0)
+MainFrame.BorderSizePixel = 0
+MainFrame.Position = UDim2.new(0.5, -250, 0.5, -200)
+MainFrame.Size = UDim2.new(0, 500, 0, 400)
+MainFrame.Visible = false
+MainFrame.ZIndex = 10
+MainFrame.Active = true
+MainFrame.Draggable = true
+
+local UICorner = Instance.new("UICorner")
+UICorner.CornerRadius = UDim.new(0, 12)
+UICorner.Parent = MainFrame
+
+local Title = Instance.new("TextLabel")
+Title.Parent = MainFrame
+Title.BackgroundTransparency = 1
+Title.Size = UDim2.new(1, 0, 0, 50)
+Title.Font = Enum.Font.GothamBold
+Title.Text = "salt v2"
+Title.TextColor3 = Color3.fromRGB(0, 255, 128)
+Title.TextScaled = true
+
+local CloseBtn = Instance.new("TextButton")
+CloseBtn.Parent = MainFrame
+CloseBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+CloseBtn.Position = UDim2.new(1, -40, 0, 8)
+CloseBtn.Size = UDim2.new(0, 32, 0, 32)
+CloseBtn.Font = Enum.Font.GothamBold
+CloseBtn.Text = "X"
+CloseBtn.TextColor3 = Color3.fromRGB(255, 100, 100)
+CloseBtn.TextScaled = true
+local CloseCorner = Instance.new("UICorner", CloseBtn)
+CloseCorner.CornerRadius = UDim.new(0, 6)
+
+local TargetsLabel = Instance.new("TextLabel")
+TargetsLabel.Parent = MainFrame
+TargetsLabel.BackgroundTransparency = 1
+TargetsLabel.Position = UDim2.new(0, 15, 0, 65)
+TargetsLabel.Size = UDim2.new(0.48, 0, 0, 30)
+TargetsLabel.Font = Enum.Font.GothamSemibold
+TargetsLabel.Text = "Цели"
+TargetsLabel.TextColor3 = Color3.fromRGB(0, 255, 128)
+TargetsLabel.TextScaled = true
+TargetsLabel.TextXAlignment = Enum.TextXAlignment.Left
+
+local TargetsScroll = Instance.new("ScrollingFrame")
+TargetsScroll.Parent = MainFrame
+TargetsScroll.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+TargetsScroll.BorderSizePixel = 0
+TargetsScroll.Position = UDim2.new(0, 15, 0, 95)
+TargetsScroll.Size = UDim2.new(0.48, -30, 0, 140)
+TargetsScroll.ScrollBarThickness = 4
+TargetsScroll.ScrollBarImageColor3 = Color3.fromRGB(0, 255, 128)
+TargetsScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+local TargetsCorner = Instance.new("UICorner", TargetsScroll)
+TargetsCorner.CornerRadius = UDim.new(0, 8)
+
+local ToolsLabel = Instance.new("TextLabel")
+ToolsLabel.Parent = MainFrame
+ToolsLabel.BackgroundTransparency = 1
+ToolsLabel.Position = UDim2.new(0.52, 0, 0, 65)
+ToolsLabel.Size = UDim2.new(0.48, 0, 0, 30)
+ToolsLabel.Font = Enum.Font.GothamSemibold
+ToolsLabel.Text = "Игрушки"
+ToolsLabel.TextColor3 = Color3.fromRGB(0, 255, 128)
+ToolsLabel.TextScaled = true
+ToolsLabel.TextXAlignment = Enum.TextXAlignment.Left
+
+local ToolsScroll = Instance.new("ScrollingFrame")
+ToolsScroll.Parent = MainFrame
+ToolsScroll.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+ToolsScroll.BorderSizePixel = 0
+ToolsScroll.Position = UDim2.new(0.52, 0, 0, 95)
+ToolsScroll.Size = UDim2.new(0.48, -15, 0, 140)
+ToolsScroll.ScrollBarThickness = 4
+ToolsScroll.ScrollBarImageColor3 = Color3.fromRGB(0, 255, 128)
+ToolsScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+local ToolsCorner = Instance.new("UICorner", ToolsScroll)
+ToolsCorner.CornerRadius = UDim.new(0, 8)
+
+local PowerLabel = Instance.new("TextLabel")
+PowerLabel.Parent = MainFrame
+PowerLabel.BackgroundTransparency = 1
+PowerLabel.Position = UDim2.new(0, 15, 0, 245)
+PowerLabel.Size = UDim2.new(0.3, 0, 0, 30)
+PowerLabel.Font = Enum.Font.GothamSemibold
+PowerLabel.Text = "Power"
+PowerLabel.TextColor3 = Color3.fromRGB(0, 255, 128)
+PowerLabel.TextScaled = true
+
+local PowerValue = Instance.new("TextLabel")
+PowerValue.Parent = MainFrame
+PowerValue.BackgroundTransparency = 1
+PowerValue.Position = UDim2.new(0.35, 0, 0, 245)
+PowerValue.Size = UDim2.new(0.15, 0, 0, 30)
+PowerValue.Font = Enum.Font.GothamBold
+PowerValue.Text = "500"
+PowerValue.TextColor3 = Color3.fromRGB(0, 255, 128)
+PowerValue.TextScaled = true
+
+local SliderTrack = Instance.new("Frame")
+SliderTrack.Parent = MainFrame
+SliderTrack.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+SliderTrack.Position = UDim2.new(0.55, 0, 0, 250)
+SliderTrack.Size = UDim2.new(0.35, 0, 0, 20)
+local TrackCorner = Instance.new("UICorner", SliderTrack)
+TrackCorner.CornerRadius = UDim.new(0, 10)
+
+local SliderBtn = Instance.new("TextButton")
+SliderBtn.Parent = SliderTrack
+SliderBtn.BackgroundColor3 = Color3.fromRGB(0, 255, 128)
+SliderBtn.BorderSizePixel = 0
+SliderBtn.Position = UDim2.new(0.5, -10, 0, 0)
+SliderBtn.Size = UDim2.new(0, 20, 1, 0)
+local BtnCorner = Instance.new("UICorner", SliderBtn)
+BtnCorner.CornerRadius = UDim.new(0, 10)
+
+local ActivateBtn = Instance.new("TextButton")
+ActivateBtn.Parent = MainFrame
+ActivateBtn.BackgroundColor3 = Color3.fromRGB(0, 255, 128)
+ActivateBtn.BorderSizePixel = 0
+ActivateBtn.Position = UDim2.new(0.1, 0, 0, 290)
+ActivateBtn.Size = UDim2.new(0.8, 0, 0, 50)
+ActivateBtn.Font = Enum.Font.GothamBold
+ActivateBtn.Text = "АКТИВАТИРОВАТЬ"
+ActivateBtn.TextColor3 = Color3.new(0,0,0)
+ActivateBtn.TextScaled = true
+local ActCorner = Instance.new("UICorner", ActivateBtn)
+ActCorner.CornerRadius = UDim.new(0, 12)
+
+local selectedTarget, selectedTool
+local powerValue = 500
+local minPower, maxPower = 100, 5000
+local spawnCount = 5
+
+local function clearScroll(scroll)
+    for _, child in pairs(scroll:GetChildren()) do
+        if child:IsA("TextButton") then child:Destroy() end
+    end
+    scroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+end
+
+local function updateTargets()
+    clearScroll(TargetsScroll)
+    local y = 0
+    for _, p in pairs(Players:GetPlayers()) do
+        if p ~= Player and p.Character then
+            local btn = Instance.new("TextButton")
+            btn.Parent = TargetsScroll
+            btn.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+            btn.Size = UDim2.new(1, -10, 0, 28)
+            btn.Position = UDim2.new(0, 5, 0, y)
+            btn.Font = Enum.Font.Gotham
+            btn.Text = p.Name
+            btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+            btn.TextScaled = true
+            local btnCorner = Instance.new("UICorner", btn)
+            btnCorner.CornerRadius = UDim.new(0, 6)
+            btn.MouseButton1Click:Connect(function()
+                selectedTarget = p
+                for _, b in pairs(TargetsScroll:GetChildren()) do
+                    if b:IsA("TextButton") then b.BackgroundColor3 = Color3.fromRGB(25, 25, 25) end
+                end
+                btn.BackgroundColor3 = Color3.fromRGB(0, 255, 128)
+            end)
+            y = y + 33
+        end
+    end
+    TargetsScroll.CanvasSize = UDim2.new(0, 0, 0, y)
+end
+
+local function updateTools()
+    clearScroll(ToolsScroll)
+    local toolsFolder = ReplicatedStorage:FindFirstChild("Tools")
+    if toolsFolder then
+        local y = 0
+        for _, tool in pairs(toolsFolder:GetChildren()) do
+            if tool:IsA("Tool") or tool:IsA("Model") then
+                local btn = Instance.new("TextButton")
+                btn.Parent = ToolsScroll
+                btn.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+                btn.Size = UDim2.new(1, -10, 0, 28)
+                btn.Position = UDim2.new(0, 5, 0, y)
+                btn.Font = Enum.Font.Gotham
+                btn.Text = tool.Name
+                btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+                btn.TextScaled = true
+                local btnCorner = Instance.new("UICorner", btn)
+                btnCorner.CornerRadius = UDim.new(0, 6)
+                btn.MouseButton1Click:Connect(function()
+                    selectedTool = tool
+                    for _, b in pairs(ToolsScroll:GetChildren()) do
+                        if b:IsA("TextButton") then b.BackgroundColor3 = Color3.fromRGB(25, 25, 25) end
+                    end
+                    btn.BackgroundColor3 = Color3.fromRGB(0, 255, 128)
+                end)
+                y = y + 33
+            end
+        end
+        ToolsScroll.CanvasSize = UDim2.new(0, 0, 0, y)
+    end
+end
+
+local function activate()
+    if not selectedTarget or not selectedTarget.Character or not selectedTarget.Character:FindFirstChild("HumanoidRootPart") then return end
+    if not selectedTool then return end
+    local myRoot = Player.Character and Player.Character:FindFirstChild("HumanoidRootPart")
+    if myRoot then
+        myRoot.CFrame = selectedTarget.Character.HumanoidRootPart.CFrame * CFrame.new(0, 0, -8)
+    end
+    local targetPos = selectedTarget.Character.HumanoidRootPart.Position
+    local camLook = WS.CurrentCamera.CFrame.LookVector
+    for i = 1, spawnCount do
+        local toolClone = selectedTool:Clone()
+        toolClone.Parent = WS
+        local primary = toolClone.PrimaryPart or toolClone:FindFirstChildWhichIsA("BasePart") or toolClone:FindFirstChild("Handle")
+        if primary then
+            primary.CFrame = CFrame.new(targetPos + Vector3.new(math.random(-8,8), math.random(5,15), math.random(-8,8)))
+            local bv = Instance.new("BodyVelocity")
+            bv.MaxForce = Vector3.new(4e5, 4e5, 4e5)
+            bv.Velocity = camLook * powerValue + Vector3.new(0, powerValue * 0.3, 0)
+            bv.Parent = primary
+            Debris:AddItem(bv, 2)
+            Debris:AddItem(toolClone, 8)
+        end
+    end
+end
+
+local dragging = false
+SliderBtn.MouseButton1Down:Connect(function() dragging = true end)
+UIS.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end
+end)
+RS.Heartbeat:Connect(function()
+    if dragging then
+        local mouse = UIS:GetMouseLocation()
+        local trackPos = SliderTrack.AbsolutePosition.X
+        local trackSize = SliderTrack.AbsoluteSize.X
+        local rel = math.clamp((mouse.X - trackPos) / trackSize, 0, 1)
+        SliderBtn.Position = UDim2.new(rel, -10, 0, 0)
+        powerValue = math.floor(minPower + (maxPower - minPower) * rel)
+        PowerValue.Text = tostring(powerValue)
+    end
 end)
 
-game:GetService("UserInputService").InputBegan:Connect(function(input)
-    if input.KeyCode == Enum.KeyCode.Insert then
-        local sg = game.Players.LocalPlayer.PlayerGui:FindFirstChild("saltv2")
-        if sg and sg:FindFirstChild("Main") then
-            sg.Main.Visible = not sg.Main.Visible
+CloseBtn.MouseButton1Click:Connect(function() MainFrame.Visible = false end)
+ActivateBtn.MouseButton1Click:Connect(activate)
+
+UIS.InputBegan:Connect(function(input)
+    local kc = input.KeyCode
+    if kc == Enum.KeyCode.Insert then
+        MainFrame.Visible = not MainFrame.Visible
+        if MainFrame.Visible then updateTargets() updateTools() end
+    elseif kc == Enum.KeyCode.F then
+        local char = Player.Character
+        local root = char and char:FindFirstChild("HumanoidRootPart")
+        if not root then return end
+        if flying then
+            flying = false
+            if bodyVelocity then bodyVelocity:Destroy() end
+            if bodyGyro then bodyGyro:Destroy() end
+        else
+            flying = true
+            bodyVelocity = Instance.new("BodyVelocity", root)
+            bodyVelocity.MaxForce = Vector3.new(4000, 4000, 4000)
+            bodyVelocity.Velocity = Vector3.new()
+            bodyGyro = Instance.new("BodyGyro", root)
+            bodyGyro.MaxTorque = Vector3.new(4000, 4000, 4000)
+            bodyGyro.CFrame = root.CFrame
+            spawn(function()
+                while flying and root.Parent do
+                    local cam = WS.CurrentCamera
+                    local vel = Vector3.new()
+                    if UIS:IsKeyDown(Enum.KeyCode.W) then vel = vel + cam.CFrame.LookVector end
+                    if UIS:IsKeyDown(Enum.KeyCode.S) then vel = vel - cam.CFrame.LookVector end
+                    if UIS:IsKeyDown(Enum.KeyCode.A) then vel = vel - cam.CFrame.RightVector end
+                    if UIS:IsKeyDown(Enum.KeyCode.D) then vel = vel + cam.CFrame.RightVector end
+                    if UIS:IsKeyDown(Enum.KeyCode.Space) then vel = vel + Vector3.new(0, 50, 0) end
+                    if UIS:IsKeyDown(Enum.KeyCode.LeftControl) then vel = vel - Vector3.new(0, 50, 0) end
+                    bodyVelocity.Velocity = vel
+                    bodyGyro.CFrame = cam.CFrame
+                    RS.Heartbeat:Wait()
+                end
+            end)
+        end
+    elseif kc == Enum.KeyCode.X then
+        noclipping = not noclipping
+        if noclipConn then noclipConn:Disconnect() end
+        if noclipping then
+            noclipConn = RS.Stepped:Connect(function()
+                local char = Player.Character
+                if char then
+                    for _, part in pairs(char:GetDescendants()) do
+                        if part:IsA("BasePart") then part.CanCollide = false end
+                    end
+                end
+            end)
         end
     end
 end)
+
+Player.CharacterRemoving:Connect(function()
+    flying = false
+    noclipping = false
+    if bodyVelocity then bodyVelocity:Destroy() end
+    if bodyGyro then bodyGyro:Destroy() end
+    if noclipConn then noclipConn:Disconnect() end
+end)
+
+spawn(function()
+    noclipConn = RS.Stepped:Connect(function()
+        local char = Player.Character
+        if char and noclipping then
+            for _, part in pairs(char:GetDescendants()) do
+                if part:IsA("BasePart") then part.CanCollide = false end
+            end
+        end
+    end)
+end)
+
+spawn(function()
+    while wait(5) do
+        if MainFrame.Visible then
+            updateTargets()
+            updateTools()
+        end
+    end
+end)
+
+updateTargets()
+updateTools()
+MainFrame.Visible = true
