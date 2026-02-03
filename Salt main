@@ -1,4 +1,4 @@
--- salt v2
+-- salt v2 (GUI controls for Fly & Noclip)
 
 local Players = game:GetService("Players")
 local UIS = game:GetService("UserInputService")
@@ -9,11 +9,12 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Player = Players.LocalPlayer
 local Mouse = Player:GetMouse()
+
 local flying = false
 local noclipping = true
 local bodyVelocity, bodyGyro, noclipConn
 
--- Список популярных игрушек (2026 актуально)
+-- Список игрушек (актуальный на 2026 из вики/скриптов)
 local TOY_NAMES = {
     "Missile", "Blobman", "Kunai", "Shuriken", "Smoke Bomb", "Unstable Substance",
     "Snowball", "Balloon", "Toy Frog", "Toy Tiger", "Toy Duck", "Toy Unicorn",
@@ -22,9 +23,10 @@ local TOY_NAMES = {
 }
 
 local selectedTarget = nil
-local selectedToyName = nil  -- имя игрушки
+local selectedToyName = nil
 local powerValue = 500
 
+-- GUI
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "saltv2"
 ScreenGui.ResetOnSpawn = false
@@ -37,8 +39,8 @@ MainFrame.Name = "Main"
 MainFrame.Parent = ScreenGui
 MainFrame.BackgroundColor3 = Color3.new(0,0,0)
 MainFrame.Position = UDim2.new(0.5, -250, 0.5, -200)
-MainFrame.Size = UDim2.new(0, 500, 0, 400)
-MainFrame.Visible = true  -- для теста; потом на Insert
+MainFrame.Size = UDim2.new(0, 500, 0, 450)  -- чуть выше для кнопок
+MainFrame.Visible = true  -- тест; потом Insert
 MainFrame.Active = true
 MainFrame.Draggable = true
 
@@ -63,21 +65,21 @@ CloseBtn.TextColor3 = Color3.fromRGB(255,80,80)
 CloseBtn.TextScaled = true
 local cc = Instance.new("UICorner", CloseBtn); cc.CornerRadius = UDim.new(0,8)
 
--- Targets
+-- Targets Scroll
 local TargetsScroll = Instance.new("ScrollingFrame")
 TargetsScroll.Parent = MainFrame
 TargetsScroll.BackgroundColor3 = Color3.fromRGB(10,10,10)
-TargetsScroll.Position = UDim2.new(0.02,0,0.15,0)
-TargetsScroll.Size = UDim2.new(0.46,0,0.4,0)
+TargetsScroll.Position = UDim2.new(0.02,0,0.13,0)
+TargetsScroll.Size = UDim2.new(0.46,0,0.38,0)
 TargetsScroll.ScrollBarImageColor3 = Color3.fromRGB(0,255,128)
 TargetsScroll.CanvasSize = UDim2.new(0,0,0,0)
 
--- Toys
+-- Toys Scroll
 local ToysScroll = Instance.new("ScrollingFrame")
 ToysScroll.Parent = MainFrame
 ToysScroll.BackgroundColor3 = Color3.fromRGB(10,10,10)
-ToysScroll.Position = UDim2.new(0.52,0,0.15,0)
-ToysScroll.Size = UDim2.new(0.46,0,0.4,0)
+ToysScroll.Position = UDim2.new(0.52,0,0.13,0)
+ToysScroll.Size = UDim2.new(0.46,0,0.38,0)
 ToysScroll.ScrollBarImageColor3 = Color3.fromRGB(0,255,128)
 ToysScroll.CanvasSize = UDim2.new(0,0,0,0)
 
@@ -85,7 +87,7 @@ ToysScroll.CanvasSize = UDim2.new(0,0,0,0)
 local PowerLabel = Instance.new("TextLabel")
 PowerLabel.Parent = MainFrame
 PowerLabel.BackgroundTransparency = 1
-PowerLabel.Position = UDim2.new(0.05,0,0.62,0)
+PowerLabel.Position = UDim2.new(0.05,0,0.55,0)
 PowerLabel.Size = UDim2.new(0.9,0,0,30)
 PowerLabel.Text = "Power: 500"
 PowerLabel.TextColor3 = Color3.fromRGB(0,255,128)
@@ -94,7 +96,7 @@ PowerLabel.TextScaled = true
 local SliderTrack = Instance.new("Frame")
 SliderTrack.Parent = MainFrame
 SliderTrack.BackgroundColor3 = Color3.fromRGB(30,30,30)
-SliderTrack.Position = UDim2.new(0.05,0,0.7,0)
+SliderTrack.Position = UDim2.new(0.05,0,0.62,0)
 SliderTrack.Size = UDim2.new(0.9,0,0,20)
 
 local SliderFill = Instance.new("Frame")
@@ -102,21 +104,45 @@ SliderFill.Parent = SliderTrack
 SliderFill.BackgroundColor3 = Color3.fromRGB(0,255,128)
 SliderFill.Size = UDim2.new(0.1,0,1,0)
 
+-- Кнопки Fly и Noclip в GUI
+local FlyBtn = Instance.new("TextButton")
+FlyBtn.Parent = MainFrame
+FlyBtn.BackgroundColor3 = Color3.fromRGB(80,80,80)  -- OFF по умолчанию
+FlyBtn.Position = UDim2.new(0.05,0,0.72,0)
+FlyBtn.Size = UDim2.new(0.42,0,0,50)
+FlyBtn.Font = Enum.Font.GothamBold
+FlyBtn.Text = "Fly: OFF"
+FlyBtn.TextColor3 = Color3.fromRGB(200,200,200)
+FlyBtn.TextScaled = true
+local FlyCorner = Instance.new("UICorner", FlyBtn); FlyCorner.CornerRadius = UDim.new(0,10)
+
+local NoclipBtn = Instance.new("TextButton")
+NoclipBtn.Parent = MainFrame
+NoclipBtn.BackgroundColor3 = Color3.fromRGB(0,255,128)  -- ON по умолчанию
+NoclipBtn.Position = UDim2.new(0.53,0,0.72,0)
+NoclipBtn.Size = UDim2.new(0.42,0,0,50)
+NoclipBtn.Font = Enum.Font.GothamBold
+NoclipBtn.Text = "Noclip: ON"
+NoclipBtn.TextColor3 = Color3.new(0,0,0)
+NoclipBtn.TextScaled = true
+local NoclipCorner = Instance.new("UICorner", NoclipBtn); NoclipCorner.CornerRadius = UDim.new(0,10)
+
+-- Activate
 local ActivateBtn = Instance.new("TextButton")
 ActivateBtn.Parent = MainFrame
 ActivateBtn.BackgroundColor3 = Color3.fromRGB(0,255,128)
-ActivateBtn.Position = UDim2.new(0.1,0,0.82,0)
+ActivateBtn.Position = UDim2.new(0.1,0,0.88,0)
 ActivateBtn.Size = UDim2.new(0.8,0,0,50)
 ActivateBtn.Text = "АКТИВАТИРОВАТЬ (ТП + СПАВН)"
 ActivateBtn.TextColor3 = Color3.new(0,0,0)
 ActivateBtn.TextScaled = true
 
--- Fly + Noclip
-local function toggleFly()
+-- Fly toggle function
+local function toggleFly(state)
+    flying = state
     local char = Player.Character
-    local root = char and char.HumanoidRootPart
+    local root = char and char:FindFirstChild("HumanoidRootPart")
     if not root then return end
-    flying = not flying
     if flying then
         bodyVelocity = Instance.new("BodyVelocity", root)
         bodyVelocity.MaxForce = Vector3.new(1e5,1e5,1e5)
@@ -124,7 +150,7 @@ local function toggleFly()
         bodyGyro = Instance.new("BodyGyro", root)
         bodyGyro.MaxTorque = Vector3.new(1e5,1e5,1e5)
         spawn(function()
-            while flying do
+            while flying and root.Parent do
                 local cam = WS.CurrentCamera
                 local move = Vector3.new()
                 if UIS:IsKeyDown(Enum.KeyCode.W) then move += cam.CFrame.LookVector end
@@ -144,8 +170,24 @@ local function toggleFly()
     end
 end
 
--- Super Throw на RMB
-local superStrength = 1500  -- сила броска (можно менять)
+-- Noclip toggle
+local function toggleNoclip(state)
+    noclipping = state
+    if noclipConn then noclipConn:Disconnect() end
+    if noclipping then
+        noclipConn = RS.Stepped:Connect(function()
+            local char = Player.Character
+            if char then
+                for _, part in pairs(char:GetDescendants()) do
+                    if part:IsA("BasePart") then part.CanCollide = false end
+                end
+            end
+        end)
+    end
+end
+
+-- Super Throw (RMB stronger)
+local superStrength = 1500
 WS.ChildAdded:Connect(function(child)
     if child.Name == "GrabParts" then
         local grabPart = child:FindFirstChild("GrabPart")
@@ -153,11 +195,10 @@ WS.ChildAdded:Connect(function(child)
             local weld = grabPart:FindFirstChildOfClass("WeldConstraint")
             if weld and weld.Part1 then
                 local grabbed = weld.Part1
-                local bv
                 child.AncestryChanged:Connect(function()
-                    if not child.Parent then  -- отпустили
+                    if not child.Parent then
                         if UIS:GetLastInputType() == Enum.UserInputType.MouseButton2 then
-                            bv = Instance.new("BodyVelocity", grabbed)
+                            local bv = Instance.new("BodyVelocity", grabbed)
                             bv.MaxForce = Vector3.new(1e9,1e9,1e9)
                             bv.Velocity = WS.CurrentCamera.CFrame.LookVector * superStrength + Vector3.new(0,300,0)
                             Debris:AddItem(bv, 0.5)
@@ -169,7 +210,7 @@ WS.ChildAdded:Connect(function(child)
     end
 end)
 
--- Update lists
+-- Update functions (как раньше)
 local function updatePlayers()
     for _, b in pairs(TargetsScroll:GetChildren()) do if b:IsA("TextButton") then b:Destroy() end end
     local y = 0
@@ -214,7 +255,7 @@ local function updateToys()
     ToysScroll.CanvasSize = UDim2.new(0,0,0,y)
 end
 
--- Power slider
+-- Slider
 local dragging = false
 SliderTrack.InputBegan:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 then dragging = true end end)
 UIS.InputEnded:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end end)
@@ -227,7 +268,7 @@ RS.RenderStepped:Connect(function()
     end
 end)
 
--- Activate
+-- Activate (ТП + спавн)
 ActivateBtn.MouseButton1Click:Connect(function()
     if not selectedTarget or not selectedToyName then return end
     local hrp = Player.Character and Player.Character:FindFirstChild("HumanoidRootPart")
@@ -235,7 +276,7 @@ ActivateBtn.MouseButton1Click:Connect(function()
     
     local pos = selectedTarget.Character.HumanoidRootPart.Position
     for i=1,5 do
-        local toy = ReplicatedStorage:FindFirstChild(selectedToyName,true) or WS:FindFirstChild(selectedToyName,true)
+        local toy = ReplicatedStorage:FindFirstChild(selectedToyName, true) or WS:FindFirstChild(selectedToyName, true)
         if toy then
             local clone = toy:Clone()
             clone.Parent = WS
@@ -252,21 +293,28 @@ ActivateBtn.MouseButton1Click:Connect(function()
     end
 end)
 
--- Binds
+-- GUI buttons
+FlyBtn.MouseButton1Click:Connect(function()
+    toggleFly(not flying)
+    FlyBtn.BackgroundColor3 = flying and Color3.fromRGB(0,255,128) or Color3.fromRGB(80,80,80)
+    FlyBtn.Text = "Fly: " .. (flying and "ON" or "OFF")
+end)
+
+NoclipBtn.MouseButton1Click:Connect(function()
+    toggleNoclip(not noclipping)
+    NoclipBtn.BackgroundColor3 = noclipping and Color3.fromRGB(0,255,128) or Color3.fromRGB(80,80,80)
+    NoclipBtn.Text = "Noclip: " .. (noclipping and "ON" or "OFF")
+end)
+
+-- Insert toggle
 UIS.InputBegan:Connect(function(input)
-    local kc = input.KeyCode
-    if kc == Enum.KeyCode.F then toggleFly() end
-    if kc == Enum.KeyCode.X then
-        noclipping = not noclipping
-        if noclipConn then noclipConn:Disconnect() end
-        if noclipping then
-            noclipConn = RS.Stepped:Connect(function()
-                local char = Player.Character
-                if char then for _,p in pairs(char:GetDescendants()) do if p:IsA("BasePart") then p.CanCollide = false end end end
-            end)
+    if input.KeyCode == Enum.KeyCode.Insert then
+        MainFrame.Visible = not MainFrame.Visible
+        if MainFrame.Visible then
+            updatePlayers()
+            updateToys()
         end
     end
-    if kc == Enum.KeyCode.Insert then MainFrame.Visible = not MainFrame.Visible end
 end)
 
 -- Auto update
@@ -277,6 +325,9 @@ spawn(function()
     end
 end)
 
+-- Init
 updatePlayers()
 updateToys()
-noclipping = true  -- noclip по умолчанию
+toggleNoclip(true)  -- noclip ON по умолчанию
+NoclipBtn.BackgroundColor3 = Color3.fromRGB(0,255,128)
+NoclipBtn.Text = "Noclip: ON"
