@@ -424,3 +424,147 @@ end)
 
 print("=== salt v2 меню должно работать ===")
 print("Если кнопки всё равно не кликаются — попробуй другой executor или обнови текущий")
+-- Фикс: перепривязываем все кнопки после появления страниц
+
+local function rebindButtons()
+    -- Закрытие
+    CloseBtn.Activated:Connect(function()
+        MainFrame.Visible = false
+        print("Закрыто крестиком")
+    end)
+    CloseBtn.MouseButton1Click:Connect(function()
+        MainFrame.Visible = false
+        print("Закрыто крестиком (backup)")
+    end)
+
+    -- Вкладки (переключение)
+    DefenseTab.Activated:Connect(function()
+        DefensePage.Visible = true
+        AttackPage.Visible = false
+        MiscPage.Visible = false
+        print("Defense открыта")
+    end)
+    DefenseTab.MouseButton1Click:Connect(function()
+        DefensePage.Visible = true
+        AttackPage.Visible = false
+        MiscPage.Visible = false
+    end)
+
+    AttackTab.Activated:Connect(function()
+        DefensePage.Visible = false
+        AttackPage.Visible = true
+        MiscPage.Visible = false
+        print("Attack открыта")
+    end)
+    AttackTab.MouseButton1Click:Connect(function()
+        DefensePage.Visible = false
+        AttackPage.Visible = true
+        MiscPage.Visible = false
+    end)
+
+    MiscTab.Activated:Connect(function()
+        DefensePage.Visible = false
+        AttackPage.Visible = false
+        MiscPage.Visible = true
+        print("Misc открыта")
+    end)
+    MiscTab.MouseButton1Click:Connect(function()
+        DefensePage.Visible = false
+        AttackPage.Visible = false
+        MiscPage.Visible = true
+    end)
+
+    -- Defense кнопки
+    AntiGrabBtn.Activated:Connect(function()
+        antiGrab = not antiGrab
+        AntiGrabBtn.BackgroundColor3 = antiGrab and Color3.fromRGB(0,255,128) or Color3.fromRGB(80,80,80)
+        AntiGrabBtn.Text = "Anti-Grab: " .. (antiGrab and "ON" or "OFF")
+        print("Anti-Grab: " .. tostring(antiGrab))
+    end)
+    AntiGrabBtn.MouseButton1Click:Connect(function()
+        antiGrab = not antiGrab
+        AntiGrabBtn.BackgroundColor3 = antiGrab and Color3.fromRGB(0,255,128) or Color3.fromRGB(80,80,80)
+        AntiGrabBtn.Text = "Anti-Grab: " .. (antiGrab and "ON" or "OFF")
+    end)
+
+    BackTPBtn.Activated:Connect(function()
+        backTP = not backTP
+        BackTPBtn.BackgroundColor3 = backTP and Color3.fromRGB(0,255,128) or Color3.fromRGB(80,80,80)
+        BackTPBtn.Text = "Back TP on Grab: " .. (backTP and "ON" or "OFF")
+        print("Back TP: " .. tostring(backTP))
+    end)
+    BackTPBtn.MouseButton1Click:Connect(function()
+        backTP = not backTP
+        BackTPBtn.BackgroundColor3 = backTP and Color3.fromRGB(0,255,128) or Color3.fromRGB(80,80,80)
+        BackTPBtn.Text = "Back TP on Grab: " .. (backTP and "ON" or "OFF")
+    end)
+
+    -- Misc кнопки
+    TPBtn.Activated:Connect(function()
+        if selectedTarget and selectedTarget.Character then
+            local hrp = Player.Character and Player.Character.HumanoidRootPart
+            if hrp then
+                hrp.CFrame = selectedTarget.Character.HumanoidRootPart.CFrame * CFrame.new(0,0,-6)
+                print("ТП выполнен")
+            end
+        end
+    end)
+    TPBtn.MouseButton1Click:Connect(function()
+        if selectedTarget and selectedTarget.Character then
+            local hrp = Player.Character and Player.Character.HumanoidRootPart
+            if hrp then
+                hrp.CFrame = selectedTarget.Character.HumanoidRootPart.CFrame * CFrame.new(0,0,-6)
+            end
+        end
+    end)
+
+    TrackBtn.Activated:Connect(function()
+        tracking = not tracking
+        TrackBtn.BackgroundColor3 = tracking and Color3.fromRGB(0,255,128) or Color3.fromRGB(80,80,80)
+        TrackBtn.Text = "Tracking: " .. (tracking and "ON" or "OFF")
+        print("Tracking: " .. tostring(tracking))
+    end)
+    TrackBtn.MouseButton1Click:Connect(function()
+        tracking = not tracking
+        TrackBtn.BackgroundColor3 = tracking and Color3.fromRGB(0,255,128) or Color3.fromRGB(80,80,80)
+        TrackBtn.Text = "Tracking: " .. (tracking and "ON" or "OFF")
+    end)
+
+    FlyBtn.Activated:Connect(function()
+        flying = not flying
+        toggleFly(flying)
+        FlyBtn.BackgroundColor3 = flying and Color3.fromRGB(0,255,128) or Color3.fromRGB(80,80,80)
+        FlyBtn.Text = "Fly: " .. (flying and "ON" or "OFF")
+        print("Fly: " .. tostring(flying))
+    end)
+    FlyBtn.MouseButton1Click:Connect(function()
+        flying = not flying
+        toggleFly(flying)
+        FlyBtn.BackgroundColor3 = flying and Color3.fromRGB(0,255,128) or Color3.fromRGB(80,80,80)
+        FlyBtn.Text = "Fly: " .. (flying and "ON" or "OFF")
+    end)
+
+    NoclipBtn.Activated:Connect(function()
+        noclipping = not noclipping
+        toggleNoclip(noclipping)
+        NoclipBtn.BackgroundColor3 = noclipping and Color3.fromRGB(0,255,128) or Color3.fromRGB(80,80,80)
+        NoclipBtn.Text = "Noclip: " .. (noclipping and "ON" or "OFF")
+        print("Noclip: " .. tostring(noclipping))
+    end)
+    NoclipBtn.MouseButton1Click:Connect(function()
+        noclipping = not noclipping
+        toggleNoclip(noclipping)
+        NoclipBtn.BackgroundColor3 = noclipping and Color3.fromRGB(0,255,128) or Color3.fromRGB(80,80,80)
+        NoclipBtn.Text = "Noclip: " .. (noclipping and "ON" or "OFF")
+    end)
+
+    print("Все кнопки перепривязаны на Activated + MouseButton1Click")
+end
+
+-- Вызываем перепривязку после создания GUI
+rebindButtons()
+
+-- Если страницы переключаются — перепривязываем снова (на всякий случай)
+DefenseTab.MouseButton1Click:Connect(rebindButtons)
+AttackTab.MouseButton1Click:Connect(rebindButtons)
+MiscTab.MouseButton1Click:Connect(rebindButtons)
