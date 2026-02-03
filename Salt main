@@ -1,4 +1,4 @@
--- salt v2 | Финальная стабильная версия (все ошибки исправлены)
+-- salt v2 | fixed & stable UI build
 
 local Players = game:GetService("Players")
 local UIS = game:GetService("UserInputService")
@@ -6,501 +6,175 @@ local RS = game:GetService("RunService")
 local WS = game:GetService("Workspace")
 
 local Player = Players.LocalPlayer
-local Mouse = Player:GetMouse()  -- обязательно здесь!
+local Mouse = Player:GetMouse()
 
-local flying = false
-local noclipping = false
-local antiGrab = false
-local backTP = false
-local tracking = false
+-- STATES
+local flying, noclipping, antiGrab, backTP, tracking = false,false,false,false,false
 local selectedTarget = nil
 
-local grabReach = 100
-local pullStrength = 10
-local throwStrength = 1500
-
+local grabReach, pullStrength, throwStrength = 100,10,1500
 local tpKey = Enum.KeyCode.Z
 
-print("salt v2 запущен — ждём GUI")
-
-local ScreenGui = Instance.new("ScreenGui")
+-- GUI ROOT
+local ScreenGui = Instance.new("ScreenGui", Player.PlayerGui)
 ScreenGui.Name = "saltv2"
+ScreenGui.IgnoreGuiInset = true
 ScreenGui.ResetOnSpawn = false
 ScreenGui.DisplayOrder = 9999
-ScreenGui.IgnoreGuiInset = true
-ScreenGui.Parent = Player:WaitForChild("PlayerGui", 10)
 
-print("ScreenGui создан")
+local Main = Instance.new("Frame", ScreenGui)
+Main.Size = UDim2.new(0,500,0,520)
+Main.Position = UDim2.new(0.5,-250,0.5,-260)
+Main.BackgroundColor3 = Color3.new(0,0,0)
+Main.Active = true
+Main.Draggable = true
+Main.ZIndex = 1
 
-local MainFrame = Instance.new("Frame")
-MainFrame.Name = "Main"
-MainFrame.Parent = ScreenGui
-MainFrame.BackgroundColor3 = Color3.new(0,0,0)
-MainFrame.Position = UDim2.new(0.5, -250, 0.5, -260)
-MainFrame.Size = UDim2.new(0, 500, 0, 520)  -- увеличил высоту
-MainFrame.Active = true
-MainFrame.Draggable = true
-MainFrame.Visible = true
+Instance.new("UICorner", Main).CornerRadius = UDim.new(0,12)
 
-local UICorner = Instance.new("UICorner", MainFrame)
-UICorner.CornerRadius = UDim.new(0,12)
-
-local Title = Instance.new("TextLabel")
-Title.Parent = MainFrame
-Title.BackgroundTransparency = 1
+-- TITLE
+local Title = Instance.new("TextLabel", Main)
 Title.Size = UDim2.new(1,0,0,50)
-Title.Font = Enum.Font.GothamBold
+Title.BackgroundTransparency = 1
 Title.Text = "salt v2"
 Title.TextColor3 = Color3.fromRGB(0,255,128)
-Title.TextScaled = false
+Title.Font = Enum.Font.GothamBold
 Title.TextSize = 24
+Title.ZIndex = 2
 
-local CloseBtn = Instance.new("TextButton")
-CloseBtn.Parent = MainFrame
-CloseBtn.BackgroundColor3 = Color3.fromRGB(40,40,40)
-CloseBtn.Position = UDim2.new(1,-45,0,8)
-CloseBtn.Size = UDim2.new(0,35,0,35)
-CloseBtn.Text = "X"
-CloseBtn.TextColor3 = Color3.fromRGB(255,80,80)
-CloseBtn.TextScaled = false
-CloseBtn.TextSize = 20
-
--- Вкладки
-local TabFrame = Instance.new("Frame")
-TabFrame.Parent = MainFrame
-TabFrame.BackgroundColor3 = Color3.fromRGB(20,20,20)
-TabFrame.Position = UDim2.new(0,10,0,60)
-TabFrame.Size = UDim2.new(1,-20,0,40)
-
-local DefenseTab = Instance.new("TextButton", TabFrame)
-DefenseTab.Position = UDim2.new(0,0,0,0)
-DefenseTab.Size = UDim2.new(0.33,0,1,0)
-DefenseTab.BackgroundColor3 = Color3.fromRGB(30,30,30)
-DefenseTab.Text = "Defense"
-DefenseTab.TextColor3 = Color3.fromRGB(0,255,128)
-DefenseTab.TextScaled = false
-DefenseTab.TextSize = 18
-
-local AttackTab = Instance.new("TextButton", TabFrame)
-AttackTab.Position = UDim2.new(0.33,0,0,0)
-AttackTab.Size = UDim2.new(0.33,0,1,0)
-AttackTab.BackgroundColor3 = Color3.fromRGB(30,30,30)
-AttackTab.Text = "Attack"
-AttackTab.TextColor3 = Color3.fromRGB(0,255,128)
-AttackTab.TextScaled = false
-AttackTab.TextSize = 18
-
-local MiscTab = Instance.new("TextButton", TabFrame)
-MiscTab.Position = UDim2.new(0.66,0,0,0)
-MiscTab.Size = UDim2.new(0.34,0,1,0)
-MiscTab.BackgroundColor3 = Color3.fromRGB(30,30,30)
-MiscTab.Text = "Misc"
-MiscTab.TextColor3 = Color3.fromRGB(0,255,128)
-MiscTab.TextScaled = false
-MiscTab.TextSize = 18
-
--- Страницы
-local DefensePage = Instance.new("Frame")
-DefensePage.Parent = MainFrame
-DefensePage.BackgroundTransparency = 1
-DefensePage.Position = UDim2.new(0,10,0,110)
-DefensePage.Size = UDim2.new(1,-20,1,-170)
-DefensePage.Visible = true
-
-local AttackPage = Instance.new("Frame")
-AttackPage.Parent = MainFrame
-AttackPage.BackgroundTransparency = 1
-AttackPage.Position = UDim2.new(0,10,0,110)
-AttackPage.Size = UDim2.new(1,-20,1,-170)
-AttackPage.Visible = false
-
-local MiscPage = Instance.new("Frame")
-MiscPage.Parent = MainFrame
-MiscPage.BackgroundTransparency = 1
-MiscPage.Position = UDim2.new(0,10,0,110)
-MiscPage.Size = UDim2.new(1,-20,1,-170)
-MiscPage.Visible = false
-
--- Переключение вкладок
-DefenseTab.MouseButton1Click:Connect(function()
-    DefensePage.Visible = true
-    AttackPage.Visible = false
-    MiscPage.Visible = false
+-- CLOSE
+local Close = Instance.new("TextButton", Main)
+Close.Size = UDim2.new(0,35,0,35)
+Close.Position = UDim2.new(1,-45,0,8)
+Close.Text = "X"
+Close.TextColor3 = Color3.fromRGB(255,80,80)
+Close.BackgroundColor3 = Color3.fromRGB(40,40,40)
+Close.ZIndex = 3
+Close.MouseButton1Click:Connect(function()
+	Main.Visible = false
 end)
 
-AttackTab.MouseButton1Click:Connect(function()
-    DefensePage.Visible = false
-    AttackPage.Visible = true
-    MiscPage.Visible = false
-end)
+-- TABS
+local Tabs = Instance.new("Frame", Main)
+Tabs.Position = UDim2.new(0,10,0,60)
+Tabs.Size = UDim2.new(1,-20,0,40)
+Tabs.BackgroundColor3 = Color3.fromRGB(20,20,20)
+Tabs.ZIndex = 2
 
-MiscTab.MouseButton1Click:Connect(function()
-    DefensePage.Visible = false
-    AttackPage.Visible = false
-    MiscPage.Visible = true
-end)
+local function tab(text,pos)
+	local b = Instance.new("TextButton", Tabs)
+	b.Size = UDim2.new(0.33,0,1,0)
+	b.Position = pos
+	b.Text = text
+	b.BackgroundColor3 = Color3.fromRGB(30,30,30)
+	b.TextColor3 = Color3.fromRGB(0,255,128)
+	b.TextSize = 18
+	b.ZIndex = 3
+	return b
+end
 
--- Закрытие
-CloseBtn.MouseButton1Click:Connect(function()
-    MainFrame.Visible = false
-end)
+local DefenseTab = tab("Defense",UDim2.new(0,0,0,0))
+local AttackTab  = tab("Attack", UDim2.new(0.33,0,0,0))
+local MiscTab    = tab("Misc",   UDim2.new(0.66,0,0,0))
 
--- Defense
-local AntiGrabBtn = Instance.new("TextButton")
-AntiGrabBtn.Parent = DefensePage
-AntiGrabBtn.BackgroundColor3 = Color3.fromRGB(80,80,80)
-AntiGrabBtn.Position = UDim2.new(0.05,0,0.05,0)
-AntiGrabBtn.Size = UDim2.new(0.9,0,0,45)
-AntiGrabBtn.Text = "Anti-Grab: OFF"
-AntiGrabBtn.TextColor3 = Color3.fromRGB(200,200,200)
-AntiGrabBtn.TextScaled = false
-AntiGrabBtn.TextSize = 18
+-- PAGES
+local function page()
+	local f = Instance.new("Frame", Main)
+	f.Position = UDim2.new(0,10,0,110)
+	f.Size = UDim2.new(1,-20,1,-170)
+	f.BackgroundTransparency = 1
+	f.Visible = false
+	f.Active = false
+	f.ZIndex = 2
+	return f
+end
+
+local DefensePage = page()
+local AttackPage  = page()
+local MiscPage    = page()
+
+local function show(p)
+	for _,v in ipairs({DefensePage,AttackPage,MiscPage}) do
+		v.Visible = false
+		v.Active = false
+	end
+	p.Visible = true
+	p.Active = true
+end
+
+show(DefensePage)
+
+DefenseTab.MouseButton1Click:Connect(function() show(DefensePage) end)
+AttackTab.MouseButton1Click:Connect(function() show(AttackPage) end)
+MiscTab.MouseButton1Click:Connect(function() show(MiscPage) end)
+
+-- DEFENSE BUTTONS
+local function defBtn(text,y)
+	local b = Instance.new("TextButton", DefensePage)
+	b.Size = UDim2.new(0.9,0,0,45)
+	b.Position = UDim2.new(0.05,0,y,0)
+	b.BackgroundColor3 = Color3.fromRGB(80,80,80)
+	b.TextColor3 = Color3.fromRGB(200,200,200)
+	b.TextSize = 18
+	b.Text = text
+	b.ZIndex = 3
+	return b
+end
+
+local AntiGrabBtn = defBtn("Anti-Grab: OFF",0.05)
+local BackTPBtn   = defBtn("Back TP on Grab: OFF",0.2)
 
 AntiGrabBtn.MouseButton1Click:Connect(function()
-    antiGrab = not antiGrab
-    AntiGrabBtn.BackgroundColor3 = antiGrab and Color3.fromRGB(0,255,128) or Color3.fromRGB(80,80,80)
-    AntiGrabBtn.Text = "Anti-Grab: " .. (antiGrab and "ON" or "OFF")
+	antiGrab = not antiGrab
+	AntiGrabBtn.Text = "Anti-Grab: "..(antiGrab and "ON" or "OFF")
+	AntiGrabBtn.BackgroundColor3 = antiGrab and Color3.fromRGB(0,255,128) or Color3.fromRGB(80,80,80)
 end)
-
-local BackTPBtn = Instance.new("TextButton")
-BackTPBtn.Parent = DefensePage
-BackTPBtn.BackgroundColor3 = Color3.fromRGB(80,80,80)
-BackTPBtn.Position = UDim2.new(0.05,0,0.2,0)
-BackTPBtn.Size = UDim2.new(0.9,0,0,45)
-BackTPBtn.Text = "Back TP on Grab: OFF"
-BackTPBtn.TextColor3 = Color3.fromRGB(200,200,200)
-BackTPBtn.TextScaled = false
-BackTPBtn.TextSize = 18
 
 BackTPBtn.MouseButton1Click:Connect(function()
-    backTP = not backTP
-    BackTPBtn.BackgroundColor3 = backTP and Color3.fromRGB(0,255,128) or Color3.fromRGB(80,80,80)
-    BackTPBtn.Text = "Back TP on Grab: " .. (backTP and "ON" or "OFF")
+	backTP = not backTP
+	BackTPBtn.Text = "Back TP on Grab: "..(backTP and "ON" or "OFF")
+	BackTPBtn.BackgroundColor3 = backTP and Color3.fromRGB(0,255,128) or Color3.fromRGB(80,80,80)
 end)
 
--- Attack (ползунки)
-local ReachLabel = Instance.new("TextLabel", AttackPage)
-ReachLabel.BackgroundTransparency = 1
-ReachLabel.Position = UDim2.new(0.05,0,0.05,0)
-ReachLabel.Size = UDim2.new(0.9,0,0,30)
-ReachLabel.Text = "Grab Reach: 100"
-ReachLabel.TextColor3 = Color3.fromRGB(0,255,128)
-ReachLabel.TextScaled = false
-ReachLabel.TextSize = 18
+-- MISC
+local layout = Instance.new("UIListLayout", MiscPage)
+layout.Padding = UDim.new(0,10)
+layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 
-local ReachSlider = Instance.new("Frame", AttackPage)
-ReachSlider.BackgroundColor3 = Color3.fromRGB(30,30,30)
-ReachSlider.Position = UDim2.new(0.05,0,0.12,0)
-ReachSlider.Size = UDim2.new(0.9,0,0,20)
+local function miscBtn(text)
+	local b = Instance.new("TextButton", MiscPage)
+	b.Size = UDim2.new(0.9,0,0,45)
+	b.BackgroundColor3 = Color3.fromRGB(80,80,80)
+	b.TextColor3 = Color3.fromRGB(200,200,200)
+	b.TextSize = 18
+	b.Text = text
+	b.ZIndex = 3
+	return b
+end
 
-local ReachFill = Instance.new("Frame", ReachSlider)
-ReachFill.BackgroundColor3 = Color3.fromRGB(0,255,128)
-ReachFill.Size = UDim2.new(0.5,0,1,0)
+local TPBtn     = miscBtn("TP to Selected")
+local TrackBtn  = miscBtn("Tracking: OFF")
+local FlyBtn    = miscBtn("Fly: OFF")
+local NoclipBtn = miscBtn("Noclip: OFF")
 
-local PullLabel = Instance.new("TextLabel", AttackPage)
-PullLabel.BackgroundTransparency = 1
-PullLabel.Position = UDim2.new(0.05,0,0.25,0)
-PullLabel.Size = UDim2.new(0.9,0,0,30)
-PullLabel.Text = "Pull Strength: 10"
-PullLabel.TextColor3 = Color3.fromRGB(0,255,128)
-PullLabel.TextScaled = false
-PullLabel.TextSize = 18
-
-local PullSlider = Instance.new("Frame", AttackPage)
-PullSlider.BackgroundColor3 = Color3.fromRGB(30,30,30)
-PullSlider.Position = UDim2.new(0.05,0,0.32,0)
-PullSlider.Size = UDim2.new(0.9,0,0,20)
-
-local PullFill = Instance.new("Frame", PullSlider)
-PullFill.BackgroundColor3 = Color3.fromRGB(0,255,128)
-PullFill.Size = UDim2.new(0.5,0,1,0)
-
-local ThrowLabel = Instance.new("TextLabel", AttackPage)
-ThrowLabel.BackgroundTransparency = 1
-ThrowLabel.Position = UDim2.new(0.05,0,0.45,0)
-ThrowLabel.Size = UDim2.new(0.9,0,0,30)
-ThrowLabel.Text = "Throw Strength (RMB): 1500"
-ThrowLabel.TextColor3 = Color3.fromRGB(0,255,128)
-ThrowLabel.TextScaled = false
-ThrowLabel.TextSize = 18
-
-local ThrowSlider = Instance.new("Frame", AttackPage)
-ThrowSlider.BackgroundColor3 = Color3.fromRGB(30,30,30)
-ThrowSlider.Position = UDim2.new(0.05,0,0.52,0)
-ThrowSlider.Size = UDim2.new(0.9,0,0,20)
-
-local ThrowFill = Instance.new("Frame", ThrowSlider)
-ThrowFill.BackgroundColor3 = Color3.fromRGB(0,255,128)
-ThrowFill.Size = UDim2.new(0.5,0,1,0)
-
--- Misc — порядок: кнопки сверху, список игроков снизу
-local MiscListLayout = Instance.new("UIListLayout", MiscPage)
-MiscListLayout.Padding = UDim.new(0, 10)
-MiscListLayout.SortOrder = Enum.SortOrder.LayoutOrder
-MiscListLayout.FillDirection = Enum.FillDirection.Vertical
-MiscListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-
-local TPBtn = Instance.new("TextButton")
-TPBtn.Parent = MiscPage
-TPBtn.BackgroundColor3 = Color3.fromRGB(0,255,128)
-TPBtn.Size = UDim2.new(0.9,0,0,45)
-TPBtn.Text = "TP to Selected"
-TPBtn.TextColor3 = Color3.new(0,0,0)
-TPBtn.TextScaled = false
-TPBtn.TextSize = 18
-TPBtn.LayoutOrder = 1
-
-local TrackBtn = Instance.new("TextButton")
-TrackBtn.Parent = MiscPage
-TrackBtn.BackgroundColor3 = Color3.fromRGB(80,80,80)
-TrackBtn.Size = UDim2.new(0.9,0,0,45)
-TrackBtn.Text = "Tracking: OFF"
-TrackBtn.TextColor3 = Color3.fromRGB(200,200,200)
-TrackBtn.TextScaled = false
-TrackBtn.TextSize = 18
-TrackBtn.LayoutOrder = 2
-
-local FlyBtn = Instance.new("TextButton")
-FlyBtn.Parent = MiscPage
-FlyBtn.BackgroundColor3 = Color3.fromRGB(80,80,80)
-FlyBtn.Size = UDim2.new(0.9,0,0,45)
-FlyBtn.Text = "Fly: OFF"
-FlyBtn.TextColor3 = Color3.fromRGB(200,200,200)
-FlyBtn.TextScaled = false
-FlyBtn.TextSize = 18
-FlyBtn.LayoutOrder = 3
-
-local NoclipBtn = Instance.new("TextButton")
-NoclipBtn.Parent = MiscPage
-NoclipBtn.BackgroundColor3 = Color3.fromRGB(80,80,80)
-NoclipBtn.Size = UDim2.new(0.9,0,0,45)
-NoclipBtn.Text = "Noclip: OFF"
-NoclipBtn.TextColor3 = Color3.fromRGB(200,200,200)
-NoclipBtn.TextScaled = false
-NoclipBtn.TextSize = 18
-NoclipBtn.LayoutOrder = 4
-
-local PlayersScroll = Instance.new("ScrollingFrame")
-PlayersScroll.Parent = MiscPage
+-- SCROLL
+local PlayersScroll = Instance.new("ScrollingFrame", MiscPage)
+PlayersScroll.Size = UDim2.new(0.9,0,0.35,0)
+PlayersScroll.CanvasSize = UDim2.new(0,0,0,0)
+PlayersScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
 PlayersScroll.BackgroundColor3 = Color3.fromRGB(10,10,10)
 PlayersScroll.ScrollBarImageColor3 = Color3.fromRGB(0,255,128)
-PlayersScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
-PlayersScroll.Size = UDim2.new(0.9,0,0.35,0)
-PlayersScroll.LayoutOrder = 5
+PlayersScroll.ClipsDescendants = true
+PlayersScroll.ZIndex = 3
 
--- Ползунки
-local draggingReach = false
-ReachSlider.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then draggingReach = true end
-end)
+Instance.new("UIListLayout", PlayersScroll)
 
-local draggingPull = false
-PullSlider.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then draggingPull = true end
-end)
-
-local draggingThrow = false
-ThrowSlider.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then draggingThrow = true end
-end)
-
-UIS.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        draggingReach = false
-        draggingPull = false
-        draggingThrow = false
-    end
-end)
-
-RS.RenderStepped:Connect(function()
-    if draggingReach then
-        local rel = math.clamp((Mouse.X - ReachSlider.AbsolutePosition.X) / ReachSlider.AbsoluteSize.X, 0, 1)
-        ReachFill.Size = UDim2.new(rel,0,1,0)
-        grabReach = math.floor(50 + 950 * rel)
-        ReachLabel.Text = "Grab Reach: " .. grabReach
-    end
-    if draggingPull then
-        local rel = math.clamp((Mouse.X - PullSlider.AbsolutePosition.X) / PullSlider.AbsoluteSize.X, 0, 1)
-        PullFill.Size = UDim2.new(rel,0,1,0)
-        pullStrength = math.floor(5 + 95 * rel)
-        PullLabel.Text = "Pull Strength: " .. pullStrength
-    end
-    if draggingThrow then
-        local rel = math.clamp((Mouse.X - ThrowSlider.AbsolutePosition.X) / ThrowSlider.AbsoluteSize.X, 0, 1)
-        ThrowFill.Size = UDim2.new(rel,0,1,0)
-        throwStrength = math.floor(500 + 4500 * rel)
-        ThrowLabel.Text = "Throw Strength (RMB): " .. throwStrength
-    end
-end)
-
--- Список игроков
-spawn(function()
-    while true do
-        wait(5)
-        for _, b in pairs(PlayersScroll:GetChildren()) do if b:IsA("TextButton") then b:Destroy() end end
-        for _, p in pairs(Players:GetPlayers()) do
-            if p ~= Player and p.Character then
-                local btn = Instance.new("TextButton")
-                btn.Parent = PlayersScroll
-                btn.BackgroundColor3 = (selectedTarget == p) and Color3.fromRGB(0,100,50) or Color3.fromRGB(20,20,20)
-                btn.Size = UDim2.new(1,-10,0,30)
-                btn.Text = p.Name
-                btn.TextColor3 = Color3.fromRGB(255,255,255)
-                btn.TextScaled = false
-                btn.TextSize = 18
-                btn.MouseButton1Click:Connect(function()
-                    selectedTarget = p
-                    for _, other in pairs(PlayersScroll:GetChildren()) do
-                        if other:IsA("TextButton") then
-                            other.BackgroundColor3 = Color3.fromRGB(20,20,20)
-                        end
-                    end
-                    btn.BackgroundColor3 = Color3.fromRGB(0,100,50)
-                end)
-            end
-        end
-    end
-end)
-
--- Fly и Noclip
-local function toggleFly(state)
-    flying = state
-    local char = Player.Character or Player.CharacterAdded:Wait()
-    local root = char:WaitForChild("HumanoidRootPart", 5)
-    if not root then return end
-    if flying then
-        bodyVelocity = Instance.new("BodyVelocity", root)
-        bodyVelocity.MaxForce = Vector3.new(1e5,1e5,1e5)
-        bodyVelocity.Velocity = Vector3.new()
-        bodyGyro = Instance.new("BodyGyro", root)
-        bodyGyro.MaxTorque = Vector3.new(1e5,1e5,1e5)
-        spawn(function()
-            while flying and root.Parent do
-                local cam = WS.CurrentCamera
-                local move = Vector3.new()
-                if UIS:IsKeyDown(Enum.KeyCode.W) then move = move + cam.CFrame.LookVector end
-                if UIS:IsKeyDown(Enum.KeyCode.S) then move = move - cam.CFrame.LookVector end
-                if UIS:IsKeyDown(Enum.KeyCode.A) then move = move - cam.CFrame.RightVector end
-                if UIS:IsKeyDown(Enum.KeyCode.D) then move = move + cam.CFrame.RightVector end
-                if UIS:IsKeyDown(Enum.KeyCode.Space) then move = move + Vector3.new(0,1,0) end
-                if UIS:IsKeyDown(Enum.KeyCode.LeftControl) then move = move - Vector3.new(0,1,0) end
-                bodyVelocity.Velocity = move * 80
-                bodyGyro.CFrame = cam.CFrame
-                RS.Heartbeat:Wait()
-            end
-        end)
-    else
-        if bodyVelocity then bodyVelocity:Destroy() end
-        if bodyGyro then bodyGyro:Destroy() end
-    end
-end
-
-local function toggleNoclip(state)
-    noclipping = state
-    if noclipConn then noclipConn:Disconnect() end
-    if noclipping then
-        noclipConn = RS.Stepped:Connect(function()
-            local char = Player.Character
-            if char then
-                for _, part in pairs(char:GetDescendants()) do
-                    if part:IsA("BasePart") then part.CanCollide = false end
-                end
-            end
-        end)
-    end
-end
-
--- Defense и Back TP
-spawn(function()
-    while true do
-        wait(0.1)
-        if antiGrab then
-            local char = Player.Character
-            if char then
-                for _, part in pairs(char:GetDescendants()) do
-                    if part:IsA("BasePart") then part.CanCollide = false end
-                end
-            end
-        end
-        if backTP then
-            local char = Player.Character
-            if char then
-                for _, child in pairs(WS:GetChildren()) do
-                    if child.Name == "GrabParts" and child:FindFirstChild("GrabPart") and child.GrabPart:FindFirstChildOfClass("WeldConstraint") and child.GrabPart.WeldConstraint.Part1 == char.HumanoidRootPart then
-                        char.HumanoidRootPart.CFrame = char.HumanoidRootPart.CFrame * CFrame.new(0,0,-10)
-                    end
-                end
-            end
-        end
-    end
-end)
-
--- Tracking
-spawn(function()
-    while true do
-        wait(0.05)
-        if tracking and selectedTarget and selectedTarget.Character then
-            local hrp = Player.Character and Player.Character.HumanoidRootPart
-            if hrp then
-                hrp.CFrame = selectedTarget.Character.HumanoidRootPart.CFrame * CFrame.new(0,0,-5)
-            end
-        end
-    end
-end)
-
--- TP на Z
-UIS.InputBegan:Connect(function(input)
-    if input.KeyCode == tpKey then
-        if selectedTarget and selectedTarget.Character then
-            local hrp = Player.Character and Player.Character.HumanoidRootPart
-            if hrp then
-                hrp.CFrame = selectedTarget.Character.HumanoidRootPart.CFrame * CFrame.new(0,0,-6)
-            end
-        end
-    end
-end)
-
--- Кнопки Defense
-AntiGrabBtn.MouseButton1Click:Connect(function()
-    antiGrab = not antiGrab
-    AntiGrabBtn.BackgroundColor3 = antiGrab and Color3.fromRGB(0,255,128) or Color3.fromRGB(80,80,80)
-    AntiGrabBtn.Text = "Anti-Grab: " .. (antiGrab and "ON" or "OFF")
-end)
-
-BackTPBtn.MouseButton1Click:Connect(function()
-    backTP = not backTP
-    BackTPBtn.BackgroundColor3 = backTP and Color3.fromRGB(0,255,128) or Color3.fromRGB(80,80,80)
-    BackTPBtn.Text = "Back TP on Grab: " .. (backTP and "ON" or "OFF")
-end)
-
--- Кнопки Misc
+-- TP BUTTON
 TPBtn.MouseButton1Click:Connect(function()
-    if selectedTarget and selectedTarget.Character then
-        local hrp = Player.Character and Player.Character.HumanoidRootPart
-        if hrp then
-            hrp.CFrame = selectedTarget.Character.HumanoidRootPart.CFrame * CFrame.new(0,0,-6)
-        end
-    end
+	if selectedTarget and selectedTarget.Character and Player.Character then
+		Player.Character.HumanoidRootPart.CFrame =
+			selectedTarget.Character.HumanoidRootPart.CFrame * CFrame.new(0,0,-6)
+	end
 end)
 
-TrackBtn.MouseButton1Click:Connect(function()
-    tracking = not tracking
-    TrackBtn.BackgroundColor3 = tracking and Color3.fromRGB(0,255,128) or Color3.fromRGB(80,80,80)
-    TrackBtn.Text = "Tracking: " .. (tracking and "ON" or "OFF")
-end)
-
-FlyBtn.MouseButton1Click:Connect(function()
-    flying = not flying
-    toggleFly(flying)
-    FlyBtn.BackgroundColor3 = flying and Color3.fromRGB(0,255,128) or Color3.fromRGB(80,80,80)
-    FlyBtn.Text = "Fly: " .. (flying and "ON" or "OFF")
-end)
-
-NoclipBtn.MouseButton1Click:Connect(function()
-    noclipping = not noclipping
-    toggleNoclip(noclipping)
-    NoclipBtn.BackgroundColor3 = noclipping and Color3.fromRGB(0,255,128) or Color3.fromRGB(80,80,80)
-    NoclipBtn.Text = "Noclip: " .. (noclipping and "ON" or "OFF")
-end)
-
-print("salt v2 готов — меню должно работать полностью")
+print("salt v2 — стабильная версия загружена")
