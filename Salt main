@@ -1,380 +1,54 @@
--- 🔥 GROK FTAP TARGET HUB 2026 | Полное GUI-меню для Fling Things and People
--- PlaceId: 6961824067
--- Фичи: Выбор цели (ник) → Выбор игрушки (из ReplicatedStorage.Tools) → Ползунок Power → ACTIVATE = ТП + СПАВН с флингом!
--- Fly: F | Noclip: X | Insert: Toggle Menu
--- Динамика: Игроки/Tools обновляются автоматически каждые 5 сек
+print("=== Grok Debug GUI Start ===")
+print("Executor: Проверяем запуск...")
 
-local PlaceId = game.PlaceId
-local FTAP_ID = 6961824067
-local isFTAP = PlaceId == FTAP_ID
-print("🚀 Grok FTAP Target Hub | PlaceId:", PlaceId)
-
--- ========== СЕРВИСЫ ==========
-local Players = game:GetService("Players")
-local UIS = game:GetService("UserInputService")
-local RS = game:GetService("RunService")
-local WS = game:GetService("Workspace")
-local Debris = game:GetService("Debris")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-
-local Player = Players.LocalPlayer
-local Mouse = Player:GetMouse()
-local flying = false
-local noclipping = true
-local bodyVelocity, bodyGyro, noclipConn
-
--- ========== GUI ==========
-local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "GrokFTAPHub"
-ScreenGui.Parent = Player:WaitForChild("PlayerGui")
-ScreenGui.ResetOnSpawn = false
-
-local MainFrame = Instance.new("Frame")
-MainFrame.Name = "MainFrame"
-MainFrame.Parent = ScreenGui
-MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
-MainFrame.BorderSizePixel = 0
-MainFrame.Position = UDim2.new(0.5, -250, 0.5, -200)
-MainFrame.Size = UDim2.new(0, 500, 0, 400)
-MainFrame.Visible = false
-
-local UICorner = Instance.new("UICorner")
-UICorner.CornerRadius = UDim.new(0, 12)
-UICorner.Parent = MainFrame
-
-local Title = Instance.new("TextLabel")
-Title.Name = "Title"
-Title.Parent = MainFrame
-Title.BackgroundTransparency = 1
-Title.Position = UDim2.new(0, 0, 0, 0)
-Title.Size = UDim2.new(1, 0, 0, 40)
-Title.Font = Enum.Font.GothamBold
-Title.Text = "🎯 Grok FTAP Target Hub"
-Title.TextColor3 = Color3.fromRGB(255, 255, 255)
-Title.TextScaled = true
-
-local CloseBtn = Instance.new("TextButton")
-CloseBtn.Name = "CloseBtn"
-CloseBtn.Parent = MainFrame
-CloseBtn.BackgroundColor3 = Color3.fromRGB(255, 85, 85)
-CloseBtn.BorderSizePixel = 0
-CloseBtn.Position = UDim2.new(1, -40, 0, 5)
-CloseBtn.Size = UDim2.new(0, 35, 0, 30)
-CloseBtn.Font = Enum.Font.GothamBold
-CloseBtn.Text = "X"
-CloseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-CloseBtn.TextScaled = true
-local CloseCorner = Instance.new("UICorner", CloseBtn); CloseCorner.CornerRadius = UDim.new(0, 6)
-
--- Targets Section
-local TargetsLabel = Instance.new("TextLabel")
-TargetsLabel.Name = "TargetsLabel"
-TargetsLabel.Parent = MainFrame
-TargetsLabel.BackgroundTransparency = 1
-TargetsLabel.Position = UDim2.new(0, 10, 0, 50)
-TargetsLabel.Size = UDim2.new(0.48, -20, 0, 25)
-TargetsLabel.Font = Enum.Font.GothamSemibold
-TargetsLabel.Text = "🎮 Выбери Цель:"
-TargetsLabel.TextColor3 = Color3.fromRGB(200, 200, 255)
-TargetsLabel.TextScaled = true
-TargetsLabel.TextXAlignment = Enum.TextXAlignment.Left
-
-local TargetsScroll = Instance.new("ScrollingFrame")
-TargetsScroll.Name = "TargetsScroll"
-TargetsScroll.Parent = MainFrame
-TargetsScroll.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
-TargetsScroll.BorderSizePixel = 0
-TargetsScroll.Position = UDim2.new(0, 10, 0, 75)
-TargetsScroll.Size = UDim2.new(0.48, -20, 0, 120)
-TargetsScroll.ScrollBarThickness = 6
-local TargetsCorner = Instance.new("UICorner", TargetsScroll); TargetsCorner.CornerRadius = UDim.new(0, 8)
-TargetsScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
-TargetsScroll.ScrollBarImageColor3 = Color3.fromRGB(100, 100, 150)
-
--- Tools Section
-local ToolsLabel = Instance.new("TextLabel")
-ToolsLabel.Name = "ToolsLabel"
-ToolsLabel.Parent = MainFrame
-ToolsLabel.BackgroundTransparency = 1
-ToolsLabel.Position = UDim2.new(0.52, 0, 0, 50)
-ToolsLabel.Size = UDim2.new(0.48, -10, 0, 25)
-ToolsLabel.Font = Enum.Font.GothamSemibold
-ToolsLabel.Text = "🛠️ Выбери Игрушку:"
-ToolsLabel.TextColor3 = Color3.fromRGB(200, 200, 255)
-ToolsLabel.TextScaled = true
-ToolsLabel.TextXAlignment = Left
-
-local ToolsScroll = Instance.new("ScrollingFrame")
-ToolsScroll.Name = "ToolsScroll"
-ToolsScroll.Parent = MainFrame
-ToolsScroll.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
-ToolsScroll.BorderSizePixel = 0
-ToolsScroll.Position = UDim2.new(0.52, 0, 0, 75)
-ToolsScroll.Size = UDim2.new(0.48, -10, 0, 120)
-ToolsScroll.ScrollBarThickness = 6
-local ToolsCorner = Instance.new("UICorner", ToolsScroll); ToolsCorner.CornerRadius = UDim.new(0, 8)
-ToolsScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
-ToolsScroll.ScrollBarImageColor3 = Color3.fromRGB(100, 100, 150)
-
--- Power Slider
-local PowerFrame = Instance.new("Frame")
-PowerFrame.Name = "PowerFrame"
-PowerFrame.Parent = MainFrame
-PowerFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
-PowerFrame.BorderSizePixel = 0
-PowerFrame.Position = UDim2.new(0, 10, 0, 205)
-PowerFrame.Size = UDim2.new(0.8, 0, 0, 40)
-local PowerFCorner = Instance.new("UICorner", PowerFrame); PowerFCorner.CornerRadius = UDim.new(0, 8)
-
-local PowerLabel = Instance.new("TextLabel")
-PowerLabel.Parent = PowerFrame
-PowerLabel.BackgroundTransparency = 1
-PowerLabel.Position = UDim2.new(0, 10, 0, 0)
-PowerLabel.Size = UDim2.new(0, 100, 1, 0)
-PowerLabel.Font = Enum.Font.GothamSemibold
-PowerLabel.Text = "⚡ Power:"
-PowerLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-PowerLabel.TextScaled = true
-PowerLabel.TextXAlignment = Left
-
-local PowerValueLabel = Instance.new("TextLabel")
-PowerValueLabel.Parent = PowerFrame
-PowerValueLabel.BackgroundTransparency = 1
-PowerValueLabel.Position = UDim2.new(0.3, 0, 0, 0)
-PowerValueLabel.Size = UDim2.new(0.3, 0, 1, 0)
-PowerValueLabel.Font = Enum.Font.GothamBold
-PowerValueLabel.Text = "500"
-PowerValueLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
-PowerValueLabel.TextScaled = true
-
-local SliderTrack = Instance.new("Frame")
-SliderTrack.Parent = PowerFrame
-SliderTrack.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
-SliderTrack.BorderSizePixel = 0
-SliderTrack.Position = UDim2.new(0.65, 0, 0.25, 0)
-SliderTrack.Size = UDim2.new(0.3, 0, 0.5, 0)
-local TrackCorner = Instance.new("UICorner", SliderTrack); TrackCorner.CornerRadius = UDim.new(0, 25)
-
-local SliderBtn = Instance.new("TextButton")
-SliderBtn.Parent = SliderTrack
-SliderBtn.BackgroundColor3 = Color3.fromRGB(0, 200, 255)
-SliderBtn.BorderSizePixel = 0
-SliderBtn.Position = UDim2.new(0, 0, 0, 0)
-SliderBtn.Size = UDim2.new(0, 20, 1, 0)
-SliderBtn.Font = Enum.Font.SourceSans
-SliderBtn.Text = ""
-local BtnCorner = Instance.new("UICorner", SliderBtn); BtnCorner.CornerRadius = UDim.new(0, 10)
-SliderBtn.Active = true
-SliderBtn.Draggable = true
-
--- Activate Button
-local ActivateBtn = Instance.new("TextButton")
-ActivateBtn.Name = "ActivateBtn"
-ActivateBtn.Parent = MainFrame
-ActivateBtn.BackgroundColor3 = Color3.fromRGB(0, 255, 100)
-ActivateBtn.BorderSizePixel = 0
-ActivateBtn.Position = UDim2.new(0.1, 0, 0, 255)
-ActivateBtn.Size = UDim2.new(0.8, 0, 0, 50)
-ActivateBtn.Font = Enum.Font.GothamBold
-ActivateBtn.Text = "🚀 АКТИВАТИРОВАТЬ!"
-ActivateBtn.TextColor3 = Color3.fromRGB(25, 25, 25)
-ActivateBtn.TextScaled = true
-local ActCorner = Instance.new("UICorner", ActivateBtn); ActCorner.CornerRadius = UDim.new(0, 12)
-
--- ========== VARIABLES ==========
-local selectedTarget = nil
-local selectedTool = nil
-local powerValue = 500
-local minPower, maxPower = 100, 5000
-local spawnCount = 5  -- фиксировано, можно добавить slider позже
-
--- ========== FUNCTIONS ==========
-local function clearScroll(scroll)
-    for _, child in pairs(scroll:GetChildren()) do
-        if child:IsA("TextButton") then child:Destroy() end
-    end
-    scroll.CanvasSize = UDim2.new(0, 0, 0, 0)
-end
-
-local function updateTargets()
-    clearScroll(TargetsScroll)
-    local yPos = 0
-    for _, p in pairs(Players:GetPlayers()) do
-        if p ~= Player and p.Character then
-            local btn = Instance.new("TextButton")
-            btn.Name = p.Name
-            btn.Parent = TargetsScroll
-            btn.BackgroundColor3 = Color3.fromRGB(50, 50, 60)
-            btn.BorderSizePixel = 0
-            btn.Position = UDim2.new(0, 5, 0, yPos)
-            btn.Size = UDim2.new(1, -10, 0, 30)
-            btn.Font = Enum.Font.Gotham
-            btn.Text = p.Name
-            btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-            btn.TextScaled = true
-            local tCorner = Instance.new("UICorner", btn); tCorner.CornerRadius = UDim.new(0, 6)
-            
-            btn.MouseButton1Click:Connect(function()
-                selectedTarget = p
-                print("🎯 Выбрана цель: " .. p.Name)
-                -- Обновить tools для этой цели? Нет, tools общие
-            end)
-            
-            yPos = yPos + 35
-        end
-    end
-    TargetsScroll.CanvasSize = UDim2.new(0, 0, 0, yPos)
-end
-
-local function updateTools()
-    clearScroll(ToolsScroll)
-    local toolsFolder = ReplicatedStorage:FindFirstChild("Tools")
-    if not toolsFolder then
-        local noTools = Instance.new("TextLabel")
-        noTools.Parent = ToolsScroll
-        noTools.BackgroundTransparency = 1
-        noTools.Size = UDim2.new(1, 0, 1, 0)
-        noTools.Font = Enum.Font.Gotham
-        noTools.Text = "Tools не найдены (перезагрузи скрипт)"
-        noTools.TextColor3 = Color3.fromRGB(255, 100, 100)
-        noTools.TextScaled = true
+local success, err = pcall(function()
+    local Players = game:GetService("Players")
+    local Player = Players.LocalPlayer
+    
+    print("Player найден:", Player and Player.Name or "NIL!")
+    
+    local PlayerGui = Player:WaitForChild("PlayerGui", 10)
+    if not PlayerGui then
+        print("ERROR: PlayerGui не найден за 10 сек!")
         return
     end
+    print("PlayerGui OK")
     
-    local yPos = 0
-    print("🛠️ Доступные Tools:", toolsFolder:GetChildren())
-    for _, tool in pairs(toolsFolder:GetChildren()) do
-        if tool:IsA("Tool") or tool:IsA("Model") then  -- типичные tools
-            local btn = Instance.new("TextButton")
-            btn.Name = tool.Name
-            btn.Parent = ToolsScroll
-            btn.BackgroundColor3 = Color3.fromRGB(50, 50, 60)
-            btn.BorderSizePixel = 0
-            btn.Position = UDim2.new(0, 5, 0, yPos)
-            btn.Size = UDim2.new(1, -10, 0, 30)
-            btn.Font = Enum.Font.Gotham
-            btn.Text = tool.Name  -- Бомба, Ракета, Воздушный шар и т.д.
-            btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-            btn.TextScaled = true
-            local tCorner = Instance.new("UICorner", btn); tCorner.CornerRadius = UDim.new(0, 6)
-            
-            btn.MouseButton1Click:Connect(function()
-                selectedTool = tool
-                print("🛠️ Выбрана игрушка: " .. tool.Name)
-            end)
-            
-            yPos = yPos + 35
-        end
-    end
-    ToolsScroll.CanvasSize = UDim2.new(0, 0, 0, yPos)
+    local ScreenGui = Instance.new("ScreenGui")
+    ScreenGui.Name = "GrokDebugGUI"
+    ScreenGui.ResetOnSpawn = false
+    ScreenGui.Enabled = true
+    ScreenGui.DisplayOrder = 999  -- самый верх
+    ScreenGui.IgnoreGuiInset = true
+    ScreenGui.Parent = PlayerGui
+    
+    print("ScreenGui создан и Parent = PlayerGui")
+    
+    local Frame = Instance.new("Frame")
+    Frame.Size = UDim2.new(0, 300, 0, 200)
+    Frame.Position = UDim2.new(0.5, -150, 0.5, -100)
+    Frame.BackgroundColor3 = Color3.fromRGB(30, 30, 50)
+    Frame.BorderSizePixel = 0
+    Frame.Parent = ScreenGui
+    
+    local Corner = Instance.new("UICorner")
+    Corner.CornerRadius = UDim.new(0, 12)
+    Corner.Parent = Frame
+    
+    local Text = Instance.new("TextLabel")
+    Text.Size = UDim2.new(1, 0, 1, 0)
+    Text.BackgroundTransparency = 1
+    Text.Text = "ТЕСТОВОЕ МЕНЮ GROK\nЕсли видишь это — GUI работает!\n\nНажми Insert для полного меню (если добавим)"
+    Text.TextColor3 = Color3.fromRGB(0, 255, 100)
+    Text.TextScaled = true
+    Text.Font = Enum.Font.GothamBold
+    Text.Parent = Frame
+    
+    print("Frame + Text добавлены. Должно появиться зелёное окно по центру!")
+end)
+
+if not success then
+    print("КРИТИЧЕСКАЯ ОШИБКА В GUI:", err)
 end
 
-local function activate()
-    if not selectedTarget or not selectedTarget.Character or not selectedTarget.Character:FindFirstChild("HumanoidRootPart") then
-        print("❌ Выбери цель!")
-        return
-    end
-    if not selectedTool then
-        print("❌ Выбери игрушку!")
-        return
-    end
-    
-    local myRoot = Player.Character and Player.Character:FindFirstChild("HumanoidRootPart")
-    if myRoot then
-        -- ТП за спину цели
-        myRoot.CFrame = selectedTarget.Character.HumanoidRootPart.CFrame * CFrame.new(0, 0, -8)
-        print("🧲 ТП к " .. selectedTarget.Name)
-    end
-    
-    -- Спавн spawnCount tools возле цели с флингом
-    local targetPos = selectedTarget.Character.HumanoidRootPart.Position
-    local camLook = WS.CurrentCamera.CFrame.LookVector
-    for i = 1, spawnCount do
-        local toolClone = selectedTool:Clone()
-        toolClone.Parent = WS
-        
-        local primary = toolClone.PrimaryPart or toolClone:FindFirstChildWhichIsA("BasePart") or toolClone:FindFirstChild("Handle")
-        if primary then
-            -- Позиция: возле цели рандомно
-            primary.CFrame = CFrame.new(targetPos + Vector3.new(math.random(-10,10), 5 + math.random(0,10), math.random(-10,10)))
-            
-            -- Флинг с power
-            local bv = Instance.new("BodyVelocity")
-            bv.MaxForce = Vector3.new(4e5, 4e5, 4e5)
-            bv.Velocity = (camLook * powerValue * 1.5) + Vector3.new(0, powerValue * 0.5, 0)
-            bv.Parent = primary
-            
-            Debris:AddItem(bv, 3)
-            Debris:AddItem(toolClone, 10)  -- авто-удаление
-        end
-    end
-    print("🚀 АКТИВАЦИЯ! " .. spawnCount .. "x " .. selectedTool.Name .. " на " .. selectedTarget.Name .. " (Power: " .. powerValue .. ")")
-end
-
--- Slider Logic
-local dragging = false
-SliderBtn.MouseButton1Down:Connect(function()
-    dragging = true
-end)
-UIS.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        dragging = false
-    end
-end)
-RS.Heartbeat:Connect(function()
-    if dragging then
-        local mousePos = UIS:GetMouseLocation()
-        local trackPos = SliderTrack.AbsolutePosition.X
-        local trackSize = SliderTrack.AbsoluteSize.X
-        local relPos = math.clamp((mousePos.X - trackPos) / trackSize, 0, 1)
-        SliderBtn.Position = UDim2.new(relPos, -10, 0, 0)
-        
-        powerValue = math.floor(minPower + (maxPower - minPower) * relPos)
-        PowerValueLabel.Text = tostring(powerValue)
-    end
-end)
-
--- ========== EVENTS ==========
-CloseBtn.MouseButton1Click:Connect(function()
-    MainFrame.Visible = false
-end)
-
-ActivateBtn.MouseButton1Click:Connect(activate)
-
--- Toggle Menu
-UIS.InputBegan:Connect(function(input)
-    if input.KeyCode == Enum.KeyCode.Insert then
-        MainFrame.Visible = not MainFrame.Visible
-        if MainFrame.Visible then
-            updateTargets()
-            updateTools()
-        end
-    elseif input.KeyCode == Enum.KeyCode.F then
-        -- Fly toggle (код из прошлых скриптов)
-        toggleFly()  -- Определи функцию как раньше
-    elseif input.KeyCode == Enum.KeyCode.X then
-        toggleNoclip()
-    end
-end)
-
--- Auto-update lists
-spawn(function()
-    while true do
-        if MainFrame.Visible then
-            updateTargets()
-            updateTools()
-        end
-        wait(5)
-    end
-end)
-
--- ========== FLY & NOCLIP (коротко, вставь полный код из предыдущего) ==========
--- Определи toggleFly(), toggleNoclip() как в первом скрипте
--- SuperFling хук если нужно
-
--- Noclip init
-toggleNoclip()  -- вкл по умолчанию
-
-print("✅ HUB ГОТОВ! | Insert = Меню | F=fly | X=noclip")
-print("👉 В меню: Выбери цель → Игрушку → Power → АКТИВАТИРОВАТЬ!")
-print("🛠️ Tools авто-из ReplicatedStorage.Tools (бомбы, ракеты, шары и т.д.)")
+print("=== Grok Debug GUI End ===")
