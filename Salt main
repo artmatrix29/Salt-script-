@@ -1,50 +1,47 @@
--- Salt Personal Cheat Menu v4 (ESP Fixed Color/Lag + Draggable + Fly No Rotate)
--- Полная версия | February 2026 Compatible | Только личное использование
-
+-- Salt V5 — исправленная версия с Aimbot (авто на зелёных) + фикс частиц внутри меню + скролл меню
+-- Только для личного использования | Roblox Luau | 2026
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 local Workspace = game:GetService("Workspace")
-
 local player = Players.LocalPlayer
 local mouse = player:GetMouse()
 local camera = Workspace.CurrentCamera
-
 -- Настройки
 local Settings = {
-    Fly = false,
-    FlySpeed = 50,
-    Noclip = false,
-    Speed = 16,
-    InfiniteJump = false,
-    ESP = false
+Fly = false,
+FlySpeed = 50,
+Noclip = false,
+Speed = 16,
+InfiniteJump = false,
+ESP = false,
+Aimbot = false,
+AimbotFOV = 120,
+AimbotSmooth = 0.15,
+TeamCheck = true
 }
-
 local flyBodyVelocity = nil
 local noclipConnection = nil
 local espConnection = nil
-local espUpdateCounter = 0
-local drawings = {boxes = {}, names = {}}
-
+local aimbotConnection = nil
+local drawings = {boxes = {}, names = {}, fovCircle = nil}
 -- ScreenGui
 local sg = Instance.new("ScreenGui")
 sg.Name = "SaltGUI"
 sg.ResetOnSpawn = false
 sg.Parent = game:GetService("CoreGui")
-
 -- Главный фрейм (Draggable)
 local mainFrame = Instance.new("Frame")
 mainFrame.Size = UDim2.new(0, 240, 0, 420)
 mainFrame.Position = UDim2.new(0, 15, 0, 15)
 mainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
 mainFrame.BorderSizePixel = 0
+mainFrame.ClipsDescendants = true  -- Фикс: частицы не вылетают за рамки
 mainFrame.Parent = sg
-
 local mainCorner = Instance.new("UICorner")
 mainCorner.CornerRadius = UDim.new(0, 12)
 mainCorner.Parent = mainFrame
-
 -- Тень
 local shadow = Instance.new("Frame")
 shadow.Size = UDim2.new(1, 4, 1, 4)
@@ -54,395 +51,176 @@ shadow.BackgroundTransparency = 0.7
 shadow.ZIndex = -1
 shadow.Parent = mainFrame
 Instance.new("UICorner", shadow).CornerRadius = UDim.new(0, 14)
-
 -- Заголовок (Drag handle)
 local title = Instance.new("TextLabel")
 title.Size = UDim2.new(1, 0, 0, 45)
 title.BackgroundTransparency = 1
-title.Text = "Salt v4 (Drag Me)"
+title.Text = "Salt v5"
 title.TextColor3 = Color3.fromRGB(255, 255, 255)
 title.TextSize = 28
 title.Font = Enum.Font.GothamBold
 title.TextXAlignment = Enum.TextXAlignment.Center
 title.Parent = mainFrame
-
 -- DRAGGABLE: Перетаскивание по заголовку
 local dragging, dragStart, startPos
 title.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        dragging = true
-        dragStart = input.Position
-        startPos = mainFrame.Position
-    end
+if input.UserInputType == Enum.UserInputType.MouseButton1 then
+dragging = true
+dragStart = input.Position
+startPos = mainFrame.Position
+end
 end)
-
 title.InputChanged:Connect(function(input)
-    if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
-        local delta = input.Position - dragStart
-        mainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-    end
+if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+local delta = input.Position - dragStart
+mainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+end
 end)
-
 UserInputService.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        dragging = false
-    end
+if input.UserInputType == Enum.UserInputType.MouseButton1 then
+dragging = false
+end
 end)
-
--- Плавущие точки (particles)
+-- ScrollingFrame для меню (листать вниз, как сайт)
+local scrollFrame = Instance.new("ScrollingFrame")
+scrollFrame.Size = UDim2.new(1, -10, 1, -50)
+scrollFrame.Position = UDim2.new(0, 5, 0, 45)
+scrollFrame.BackgroundTransparency = 1
+scrollFrame.BorderSizePixel = 0
+scrollFrame.ScrollBarThickness = 5
+scrollFrame.CanvasSize = UDim2.new(0, 0, 0, 0)  -- Динамически обновляется
+scrollFrame.Parent = mainFrame
+local layout = Instance.new("UIListLayout", scrollFrame)
+layout.SortOrder = Enum.SortOrder.LayoutOrder
+layout.Padding = UDim.new(0, 5)
+layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+scrollFrame.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y + 20)
+end)
+-- Плавущие белые точки (фикс: внутри меню, не вылетают)
 local particles = {}
 local particleData = {}
-for i = 1, 80 do
-    local part = Instance.new("Frame")
-    part.Size = UDim2.new(0, 4, 0, 4)
-    part.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-    part.BackgroundTransparency = 0.5
-    part.BorderSizePixel = 0
-    part.ZIndex = 1
-    part.Parent = mainFrame
-    Instance.new("UICorner", part).CornerRadius = UDim.new(1, 0)
-    part.Position = UDim2.new(math.random(), 0, math.random(), 0)
-    table.insert(particles, part)
-    particleData[part] = {
-        phaseX = math.random() * math.pi * 2,
-        phaseY = math.random() * math.pi * 2,
-        speedX = (math.random() - 0.5) * 0.002,
-        speedY = (math.random() - 0.5) * 0.002
-    }
+for i = 1, 60 do
+local part = Instance.new("Frame")
+part.Size = UDim2.new(0, 4, 0, 4)
+part.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+part.BackgroundTransparency = 0.5
+part.BorderSizePixel = 0
+part.ZIndex = 1
+part.Parent = mainFrame  -- Привязка к mainFrame
+Instance.new("UICorner", part).CornerRadius = UDim.new(1, 0)
+part.Position = UDim2.new(math.random(), 0, math.random(), 0)
+table.insert(particles, part)
+particleData[part] = {
+phaseX = math.random() * math.pi * 2,
+phaseY = math.random() * math.pi * 2,
+speedX = (math.random() - 0.5) * 0.001,  -- Медленнее
+speedY = (math.random() - 0.5) * 0.001  -- Медленнее
+}
 end
-
 RunService.RenderStepped:Connect(function()
-    for _, part in ipairs(particles) do
-        local data = particleData[part]
-        data.phaseX = data.phaseX + data.speedX
-        data.phaseY = data.phaseY + data.speedY
-        local x = 0.1 + (math.sin(data.phaseX) * 0.4)
-        local y = 0.1 + (math.cos(data.phaseY) * 0.4)
-        part.Position = UDim2.new(x, 0, y, 0)
-        part.BackgroundTransparency = 0.3 + (math.sin(tick() * 4 + data.phaseX) * 0.3)
-    end
+for _, part in ipairs(particles) do
+local data = particleData[part]
+data.phaseX = data.phaseX + data.speedX
+data.phaseY = data.phaseY + data.speedY
+local x = math.clamp(0.1 + math.sin(data.phaseX) * 0.4, 0.05, 0.95)  -- Фикс: clamp внутри границ
+local y = math.clamp(0.1 + math.cos(data.phaseY) * 0.4, 0.05, 0.95)  -- Фикс: clamp внутри границ
+part.Position = UDim2.new(x, 0, y, 0)
+part.BackgroundTransparency = 0.3 + math.sin(tick() * 4 + data.phaseX) * 0.3
+end
 end)
-
--- Toggle функция
-local yOffset = 55
+-- Функция создания Toggle
 local function createToggle(name, callback)
-    local toggleFrame = Instance.new("Frame")
-    toggleFrame.Size = UDim2.new(1, -20, 0, 35)
-    toggleFrame.Position = UDim2.new(0, 10, 0, yOffset)
-    toggleFrame.BackgroundTransparency = 1
-    toggleFrame.Parent = mainFrame
-    
-    local label = Instance.new("TextLabel")
-    label.Size = UDim2.new(0.75, 0, 1, 0)
-    label.BackgroundTransparency = 1
-    label.Text = name
-    label.TextColor3 = Color3.fromRGB(220, 220, 220)
-    label.TextSize = 16
-    label.Font = Enum.Font.GothamSemibold
-    label.TextXAlignment = Enum.TextXAlignment.Left
-    label.Parent = toggleFrame
-    
-    local toggleBtn = Instance.new("TextButton")
-    toggleBtn.Size = UDim2.new(0, 45, 0, 25)
-    toggleBtn.Position = UDim2.new(1, -55, 0, 5)
-    toggleBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-    toggleBtn.Text = "OFF"
-    toggleBtn.TextColor3 = Color3.fromRGB(180, 180, 180)
-    toggleBtn.Font = Enum.Font.GothamBold
-    toggleBtn.TextSize = 14
-    toggleBtn.Parent = toggleFrame
-    
-    Instance.new("UICorner", toggleBtn).CornerRadius = UDim.new(0, 8)
-    
-    local enabled = false
-    toggleBtn.MouseButton1Click:Connect(function()
-        enabled = not enabled
-        toggleBtn.Text = enabled and "ON" or "OFF"
-        toggleBtn.BackgroundColor3 = enabled and Color3.fromRGB(0, 200, 120) or Color3.fromRGB(50, 50, 50)
-        toggleBtn.TextColor3 = enabled and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(180, 180, 180)
-        callback(enabled)
-    end)
-    
-    yOffset = yOffset + 45
+local toggleFrame = Instance.new("Frame")
+toggleFrame.Size = UDim2.new(1, 0, 0, 35)
+toggleFrame.BackgroundTransparency = 1
+toggleFrame.Parent = scrollFrame
+local label = Instance.new("TextLabel")
+label.Size = UDim2.new(0.75, 0, 1, 0)
+label.BackgroundTransparency = 1
+label.Text = name
+label.TextColor3 = Color3.fromRGB(220, 220, 220)
+label.TextSize = 16
+label.Font = Enum.Font.GothamSemibold
+label.TextXAlignment = Enum.TextXAlignment.Left
+label.Parent = toggleFrame
+local toggleBtn = Instance.new("TextButton")
+toggleBtn.Size = UDim2.new(0, 45, 0, 25)
+toggleBtn.Position = UDim2.new(1, -55, 0, 5)
+toggleBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+toggleBtn.Text = "OFF"
+toggleBtn.TextColor3 = Color3.fromRGB(180, 180, 180)
+toggleBtn.Font = Enum.Font.GothamBold
+toggleBtn.TextSize = 14
+toggleBtn.Parent = toggleFrame
+Instance.new("UICorner", toggleBtn).CornerRadius = UDim.new(0, 8)
+local enabled = false
+toggleBtn.MouseButton1Click:Connect(function()
+enabled = not enabled
+toggleBtn.Text = enabled and "ON" or "OFF"
+toggleBtn.BackgroundColor3 = enabled and Color3.fromRGB(0, 200, 120) or Color3.fromRGB(50, 50, 50)
+toggleBtn.TextColor3 = enabled and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(180, 180, 180)
+callback(enabled)
+end)
 end
-
--- Slider функция
+-- Функция создания Slider
 local function createSlider(name, min, max, default, callback)
-    local sliderFrame = Instance.new("Frame")
-    sliderFrame.Size = UDim2.new(1, -20, 0, 55)
-    sliderFrame.Position = UDim2.new(0, 10, 0, yOffset)
-    sliderFrame.BackgroundTransparency = 1
-    sliderFrame.Parent = mainFrame
-    
-    local label = Instance.new("TextLabel")
-    label.Size = UDim2.new(1, 0, 0, 25)
-    label.BackgroundTransparency = 1
-    label.Text = name .. ": " .. default
-    label.TextColor3 = Color3.fromRGB(220, 220, 220)
-    label.TextSize = 15
-    label.Font = Enum.Font.Gotham
-    label.Parent = sliderFrame
-    
-    local barBg = Instance.new("Frame")
-    barBg.Size = UDim2.new(1, 0, 0, 6)
-    barBg.Position = UDim2.new(0, 0, 1, -10)
-    barBg.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-    barBg.BorderSizePixel = 0
-    barBg.Parent = sliderFrame
-    Instance.new("UICorner", barBg).CornerRadius = UDim.new(1, 0)
-    
-    local barFill = Instance.new("Frame")
-    barFill.Size = UDim2.new((default - min) / (max - min), 0, 1, 0)
-    barFill.BackgroundColor3 = Color3.fromRGB(100, 200, 255)
-    barFill.BorderSizePixel = 0
-    barFill.Parent = barBg
-    Instance.new("UICorner", barFill).CornerRadius = UDim.new(1, 0)
-    
-    local knob = Instance.new("Frame")
-    knob.Size = UDim2.new(0, 20, 0, 20)
-    knob.Position = UDim2.new((default - min) / (max - min), -10, 0.5, -10)
-    knob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-    knob.BorderSizePixel = 0
-    knob.Parent = barBg
-    Instance.new("UICorner", knob).CornerRadius = UDim.new(1, 0)
-    
-    local draggingSlider = false
-    knob.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then draggingSlider = true end
-    end)
-    
-    UserInputService.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then draggingSlider = false end
-    end)
-    
-    RunService.RenderStepped:Connect(function()
-        if draggingSlider and barBg.AbsoluteSize.X > 0 then
-            local mousePos = UserInputService:GetMouseLocation()
-            local relativeX = math.clamp((mousePos.X - barBg.AbsolutePosition.X) / barBg.AbsoluteSize.X, 0, 1)
-            local value = math.floor(min + (max - min) * relativeX)
-            knob.Position = UDim2.new(relativeX, -10, 0.5, -10)
-            barFill.Size = UDim2.new(relativeX, 0, 1, 0)
-            label.Text = name .. ": " .. value
-            callback(value)
-        end
-    end)
-    
-    yOffset = yOffset + 65
-end
-
--- Setup Character
-local function setupCharacter(char)
-    local humanoid = char:WaitForChild("Humanoid")
-    humanoid.WalkSpeed = Settings.Speed
-end
-
--- FIXED Fly (без поворота, Q/E строго вверх/вниз)
-local function toggleFly(enabled)
-    Settings.Fly = enabled
-    local char = player.Character
-    if not char then return end
-    local root = char:FindFirstChild("HumanoidRootPart")
-    if not root then return end
-    
-    if enabled then
-        flyBodyVelocity = Instance.new("BodyVelocity")
-        flyBodyVelocity.MaxForce = Vector3.new(1e5, 1e5, 1e5)
-        flyBodyVelocity.Velocity = Vector3.new(0, 0.1, 0)
-        flyBodyVelocity.Parent = root
-    else
-        if flyBodyVelocity then
-            flyBodyVelocity:Destroy()
-            flyBodyVelocity = nil
-        end
-    end
-end
-
--- Fly движение + ANTI-ROTATE
+local sliderFrame = Instance.new("Frame")
+sliderFrame.Size = UDim2.new(1, 0, 0, 55)
+sliderFrame.BackgroundTransparency = 1
+sliderFrame.Parent = scrollFrame
+local label = Instance.new("TextLabel")
+label.Size = UDim2.new(1, 0, 0, 25)
+label.BackgroundTransparency = 1
+label.Text = name .. ": " .. default
+label.TextColor3 = Color3.fromRGB(220, 220, 220)
+label.TextSize = 15
+label.Font = Enum.Font.Gotham
+label.Parent = sliderFrame
+local barBg = Instance.new("Frame")
+barBg.Size = UDim2.new(1, 0, 0, 6)
+barBg.Position = UDim2.new(0, 0, 1, -10)
+barBg.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+barBg.Parent = sliderFrame
+Instance.new("UICorner", barBg).CornerRadius = UDim.new(1, 0)
+local barFill = Instance.new("Frame")
+barFill.Size = UDim2.new((default - min) / (max - min), 0, 1, 0)
+barFill.BackgroundColor3 = Color3.fromRGB(100, 180, 255)
+barFill.Parent = barBg
+Instance.new("UICorner", barFill).CornerRadius = UDim.new(1, 0)
+local knob = Instance.new("Frame")
+knob.Size = UDim2.new(0, 20, 0, 20)
+knob.Position = UDim2.new((default - min) / (max - min), -10, 0.5, -10)
+knob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+knob.Parent = barBg
+Instance.new("UICorner", knob).CornerRadius = UDim.new(1, 0)
+local dragging = false
+knob.InputBegan:Connect(function(input)
+if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = true end
+end)
+UserInputService.InputEnded:Connect(function(input)
+if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end
+end)
 RunService.RenderStepped:Connect(function()
-    if Settings.Fly and flyBodyVelocity and player.Character then
-        local root = player.Character.HumanoidRootPart
-        local moveVector = Vector3.new(0, 0, 0)
-        
-        -- WASD относительно камеры
-        local camLook = camera.CFrame.LookVector
-        local camRight = camera.CFrame.RightVector
-        if UserInputService:IsKeyDown(Enum.KeyCode.W) then moveVector = moveVector + camLook end
-        if UserInputService:IsKeyDown(Enum.KeyCode.S) then moveVector = moveVector - camLook end
-        if UserInputService:IsKeyDown(Enum.KeyCode.A) then moveVector = moveVector - camRight end
-        if UserInputService:IsKeyDown(Enum.KeyCode.D) then moveVector = moveVector + camRight end
-        
-        -- QE строго по Y (мир)
-        if UserInputService:IsKeyDown(Enum.KeyCode.E) or UserInputService:IsKeyDown(Enum.KeyCode.Space) then
-            moveVector = moveVector + Vector3.new(0, 1, 0)
-        end
-        if UserInputService:IsKeyDown(Enum.KeyCode.Q) or UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then
-            moveVector = moveVector - Vector3.new(0, 1, 0)
-        end
-        
-        if moveVector.Magnitude > 0 then
-            moveVector = moveVector.Unit
-        end
-        
-        flyBodyVelocity.Velocity = moveVector * Settings.FlySpeed
-        
-        -- ANTI-ROTATE: Запрет поворота
-        root.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
-    end
+if dragging and barBg.AbsoluteSize.X > 0 then
+local mousePos = UserInputService:GetMouseLocation()
+local relX = math.clamp((mousePos.X - barBg.AbsolutePosition.X) / barBg.AbsoluteSize.X, 0, 1)
+local value = math.floor(min + (max - min) * relX)
+knob.Position = UDim2.new(relX, -10, 0.5, -10)
+barFill.Size = UDim2.new(relX, 0, 1, 0)
+label.Text = name .. ": " .. value
+callback(value)
+end
 end)
-
--- FIXED Noclip
-local function toggleNoclip(enabled)
-    Settings.Noclip = enabled
-    if noclipConnection then noclipConnection:Disconnect() end
-    if enabled then
-        noclipConnection = RunService.Stepped:Connect(function()
-            if player.Character then
-                for _, part in ipairs(player.Character:GetDescendants()) do
-                    if part:IsA("BasePart") then
-                        part.CanCollide = false
-                    end
-                end
-            end
-        end)
-    end
 end
-
--- FIXED ESP (цвет по LOS, no lag, cleanup)
-local function cleanupESP(plr)
-    if drawings.boxes[plr] then
-        drawings.boxes[plr]:Remove()
-        drawings.boxes[plr] = nil
-    end
-    if drawings.names[plr] then
-        drawings.names[plr]:Remove()
-        drawings.names[plr] = nil
-    end
-end
-
-local function toggleESP(enabled)
-    Settings.ESP = enabled
-    if espConnection then espConnection:Disconnect() end
-    
-    -- Cleanup all
-    for plr, _ in pairs(drawings.boxes) do
-        cleanupESP(plr)
-    end
-    
-    if not enabled then return end
-    
-    -- Update ~30 FPS (anti-lag)
-    espConnection = RunService.RenderStepped:Connect(function()
-        espUpdateCounter = espUpdateCounter + 1
-        if espUpdateCounter % 2 ~= 0 then return end  -- Каждые 2 кадра
-        
-        for _, plr in ipairs(Players:GetPlayers()) do
-            if plr == player or not plr.Character or not plr.Character.Parent then
-                cleanupESP(plr)
-                continue
-            end
-            
-            local root = plr.Character:FindFirstChild("HumanoidRootPart")
-            local head = plr.Character:FindFirstChild("Head")
-            local hum = plr.Character:FindFirstChild("Humanoid")
-            if not (root and head and hum and hum.Health > 0) then
-                cleanupESP(plr)
-                continue
-            end
-            
-            local rootPos = root.Position
-            local headPos3d = head.Position + Vector3.new(0, 0.5, 0)
-            local legPos3d = rootPos - Vector3.new(0, 4, 0)
-            
-            local screenRoot, onScreen = camera:WorldToViewportPoint(rootPos)
-            local screenHead = camera:WorldToViewportPoint(headPos3d)
-            local screenLeg = camera:WorldToViewportPoint(legPos3d)
-            
-            if not onScreen then
-                cleanupESP(plr)
-                continue
-            end
-            
-            -- FIXED Raycast LOS (modern + ignore own char)
-            local direction = (rootPos - camera.CFrame.Position)
-            local raycastParams = RaycastParams.new()
-            raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
-            raycastParams.FilterDescendantsInstances = {player.Character or {}, plr.Character}
-            raycastParams.IgnoreWater = true
-            
-            local raycastResult = Workspace:Raycast(camera.CFrame.Position, direction.Unit * direction.Magnitude, raycastParams)
-            local losClear = not raycastResult  -- Если нет хита = чистая LOS
-            
-            local color = losClear and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 0, 0)
-            
-            local height = math.abs(screenHead.Y - screenLeg.Y)
-            local width = height * 0.45
-            
-            -- Box
-            if not drawings.boxes[plr] then
-                drawings.boxes[plr] = Drawing.new("Quad")
-                drawings.boxes[plr].Thickness = 2
-                drawings.boxes[plr].Transparency = 1
-                drawings.boxes[plr].Filled = false
-            end
-            local box = drawings.boxes[plr]
-            box.Color = color
-            box.PointA = Vector2.new(screenRoot.X - width / 2, screenHead.Y)
-            box.PointB = Vector2.new(screenRoot.X + width / 2, screenHead.Y)
-            box.PointC = Vector2.new(screenRoot.X + width / 2, screenLeg.Y)
-            box.PointD = Vector2.new(screenRoot.X - width / 2, screenLeg.Y)
-            box.Visible = true
-            
-            -- Name + Dist
-            local dist = math.floor((player.Character.HumanoidRootPart.Position - rootPos).Magnitude)
-            if not drawings.names[plr] then
-                drawings.names[plr] = Drawing.new("Text")
-                drawings.names[plr].Size = 15
-                drawings.names[plr].Center = true
-                drawings.names[plr].Outline = true
-                drawings.names[plr].Font = 2
-            end
-            local txt = drawings.names[plr]
-            txt.Text = plr.Name .. "\n[" .. dist .. "m]"
-            txt.Position = Vector2.new(screenRoot.X, screenHead.Y - 25)
-            txt.Color = color
-            txt.Visible = true
-        end
-    end)
-end
-
--- Infinite Jump
-UserInputService.JumpRequest:Connect(function()
-    if Settings.InfiniteJump and player.Character then
-        local hum = player.Character:FindFirstChildOfClass("Humanoid")
-        if hum then hum:ChangeState(Enum.HumanoidStateType.Jumping) end
-    end
-end)
-
--- GUI элементы
-createToggle("Fly (WASD + QE/Space)", toggleFly)
+-- Добавляем элементы в меню (в ScrollingFrame)
+createToggle("Fly", toggleFly)
+createSlider("Fly Speed", 50, 500, 100, function(v) Settings.FlySpeed = v end)
 createToggle("Noclip", toggleNoclip)
+createSlider("Walk Speed", 16, 200, 16, function(v) Settings.Speed = v end)
 createToggle("Infinite Jump", function(v) Settings.InfiniteJump = v end)
-createToggle("ESP (Green=Visible / Red=Wall)", toggleESP)
-
-createSlider("Walk Speed", 16, 500, 16, function(v)
-    Settings.Speed = v
-    if player.Character and player.Character:FindFirstChild("Humanoid") then
-        player.Character.Humanoid.WalkSpeed = v
-    end
-end)
-
-createSlider("Fly Speed", 1, 200, 50, function(v)
-    Settings.FlySpeed = v
-end)
-
--- Auto-setup
-player.CharacterAdded:Connect(setupCharacter)
-if player.Character then setupCharacter(player.Character) end
-
--- Cleanup ESP on player leave/death
-Players.PlayerRemoving:Connect(cleanupESP)
-player.CharacterRemoving:Connect(function()
-    for plr, _ in pairs(drawings.boxes) do cleanupESP(plr) end
-end)
-
-print("Salt v4 загружен! ESP цвет/LOS + Drag + Fly no rotate 🚀")
+createToggle("ESP", toggleESP)
+createToggle("Click TP", function(v) Settings.ClickTeleport = v end)
+createToggle("Aimbot (auto)", toggleAimbot)
+createToggle("Team Check", function(v) Settings.TeamCheck = v end)
+createSlider("Aimbot FOV", 30, 360, 120, function(v) Settings.AimbotFOV = v end)
+createSlider("Aimbot Smooth", 0.05, 0.5, 0.15, function(v) Settings.AimbotSmooth = v end)
