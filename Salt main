@@ -1,4 +1,4 @@
--- salt v2 | Финальная стабильная версия (все фиксы применены)
+-- salt v2 | Финальная стабильная версия (все ошибки исправлены)
 
 local Players = game:GetService("Players")
 local UIS = game:GetService("UserInputService")
@@ -36,7 +36,7 @@ local MainFrame = Instance.new("Frame")
 MainFrame.Name = "Main"
 MainFrame.Parent = ScreenGui
 MainFrame.BackgroundColor3 = Color3.new(0,0,0)
-MainFrame.Position = UDim2.new(0.5, -250, 0.5, -260)  -- чуть выше
+MainFrame.Position = UDim2.new(0.5, -250, 0.5, -260)
 MainFrame.Size = UDim2.new(0, 500, 0, 520)  -- увеличил высоту
 MainFrame.Active = true
 MainFrame.Draggable = true
@@ -146,7 +146,8 @@ CloseBtn.MouseButton1Click:Connect(function()
 end)
 
 -- Defense
-local AntiGrabBtn = Instance.new("TextButton", DefensePage)
+local AntiGrabBtn = Instance.new("TextButton")
+AntiGrabBtn.Parent = DefensePage
 AntiGrabBtn.BackgroundColor3 = Color3.fromRGB(80,80,80)
 AntiGrabBtn.Position = UDim2.new(0.05,0,0.05,0)
 AntiGrabBtn.Size = UDim2.new(0.9,0,0,45)
@@ -161,7 +162,8 @@ AntiGrabBtn.MouseButton1Click:Connect(function()
     AntiGrabBtn.Text = "Anti-Grab: " .. (antiGrab and "ON" or "OFF")
 end)
 
-local BackTPBtn = Instance.new("TextButton", DefensePage)
+local BackTPBtn = Instance.new("TextButton")
+BackTPBtn.Parent = DefensePage
 BackTPBtn.BackgroundColor3 = Color3.fromRGB(80,80,80)
 BackTPBtn.Position = UDim2.new(0.05,0,0.2,0)
 BackTPBtn.Size = UDim2.new(0.9,0,0,45)
@@ -231,77 +233,60 @@ local ThrowFill = Instance.new("Frame", ThrowSlider)
 ThrowFill.BackgroundColor3 = Color3.fromRGB(0,255,128)
 ThrowFill.Size = UDim2.new(0.5,0,1,0)
 
--- Misc
--- Misc Page — порядок: кнопки сверху, список игроков снизу (не перекрывает)
-
+-- Misc — порядок: кнопки сверху, список игроков снизу
 local MiscListLayout = Instance.new("UIListLayout", MiscPage)
 MiscListLayout.Padding = UDim.new(0, 10)
 MiscListLayout.SortOrder = Enum.SortOrder.LayoutOrder
 MiscListLayout.FillDirection = Enum.FillDirection.Vertical
 MiscListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 
--- TPBtn
-TPBtn.LayoutOrder = 1
+local TPBtn = Instance.new("TextButton")
 TPBtn.Parent = MiscPage
+TPBtn.BackgroundColor3 = Color3.fromRGB(0,255,128)
 TPBtn.Size = UDim2.new(0.9,0,0,45)
+TPBtn.Text = "TP to Selected"
+TPBtn.TextColor3 = Color3.new(0,0,0)
+TPBtn.TextScaled = false
+TPBtn.TextSize = 18
+TPBtn.LayoutOrder = 1
 
--- TrackBtn
-TrackBtn.LayoutOrder = 2
+local TrackBtn = Instance.new("TextButton")
 TrackBtn.Parent = MiscPage
+TrackBtn.BackgroundColor3 = Color3.fromRGB(80,80,80)
 TrackBtn.Size = UDim2.new(0.9,0,0,45)
+TrackBtn.Text = "Tracking: OFF"
+TrackBtn.TextColor3 = Color3.fromRGB(200,200,200)
+TrackBtn.TextScaled = false
+TrackBtn.TextSize = 18
+TrackBtn.LayoutOrder = 2
 
--- FlyBtn
-FlyBtn.LayoutOrder = 3
+local FlyBtn = Instance.new("TextButton")
 FlyBtn.Parent = MiscPage
+FlyBtn.BackgroundColor3 = Color3.fromRGB(80,80,80)
 FlyBtn.Size = UDim2.new(0.9,0,0,45)
+FlyBtn.Text = "Fly: OFF"
+FlyBtn.TextColor3 = Color3.fromRGB(200,200,200)
+FlyBtn.TextScaled = false
+FlyBtn.TextSize = 18
+FlyBtn.LayoutOrder = 3
 
--- NoclipBtn
-NoclipBtn.LayoutOrder = 4
+local NoclipBtn = Instance.new("TextButton")
 NoclipBtn.Parent = MiscPage
+NoclipBtn.BackgroundColor3 = Color3.fromRGB(80,80,80)
 NoclipBtn.Size = UDim2.new(0.9,0,0,45)
+NoclipBtn.Text = "Noclip: OFF"
+NoclipBtn.TextColor3 = Color3.fromRGB(200,200,200)
+NoclipBtn.TextScaled = false
+NoclipBtn.TextSize = 18
+NoclipBtn.LayoutOrder = 4
 
--- PlayersScroll — теперь внизу, не перекрывает
+local PlayersScroll = Instance.new("ScrollingFrame")
 PlayersScroll.Parent = MiscPage
-PlayersScroll.LayoutOrder = 5
-PlayersScroll.Position = UDim2.new(0,0,0,0)  -- Position не нужен с UIListLayout
-PlayersScroll.Size = UDim2.new(0.9,0,0.35,0)  -- высота меньше, чтобы уместилось
 PlayersScroll.BackgroundColor3 = Color3.fromRGB(10,10,10)
 PlayersScroll.ScrollBarImageColor3 = Color3.fromRGB(0,255,128)
-PlayersScroll.CanvasSize = UDim2.new(0,0,0,0)
-PlayersScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y  -- сам подстраивается под контент
-
--- Обновление списка игроков (остаётся то же)
-spawn(function()
-    while true do
-        wait(5)
-        for _, b in pairs(PlayersScroll:GetChildren()) do
-            if b:IsA("TextButton") then b:Destroy() end
-        end
-        local y = 0
-        for _, p in pairs(Players:GetPlayers()) do
-            if p ~= Player and p.Character then
-                local btn = Instance.new("TextButton")
-                btn.Parent = PlayersScroll
-                btn.BackgroundColor3 = (selectedTarget == p) and Color3.fromRGB(0,100,50) or Color3.fromRGB(20,20,20)
-                btn.Size = UDim2.new(1,-10,0,30)
-                btn.Text = p.Name
-                btn.TextColor3 = Color3.fromRGB(255,255,255)
-                btn.TextScaled = false
-                btn.TextSize = 18
-                btn.MouseButton1Click:Connect(function()
-                    selectedTarget = p
-                    -- подсветка
-                    for _, other in pairs(PlayersScroll:GetChildren()) do
-                        if other:IsA("TextButton") then
-                            other.BackgroundColor3 = Color3.fromRGB(20,20,20)
-                        end
-                    end
-                    btn.BackgroundColor3 = Color3.fromRGB(0,100,50)
-                end)
-            end
-        end
-    end
-end)
+PlayersScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+PlayersScroll.Size = UDim2.new(0.9,0,0.35,0)
+PlayersScroll.LayoutOrder = 5
 
 -- Ползунки
 local draggingReach = false
@@ -353,21 +338,18 @@ spawn(function()
     while true do
         wait(5)
         for _, b in pairs(PlayersScroll:GetChildren()) do if b:IsA("TextButton") then b:Destroy() end end
-        local y = 0
         for _, p in pairs(Players:GetPlayers()) do
             if p ~= Player and p.Character then
                 local btn = Instance.new("TextButton")
                 btn.Parent = PlayersScroll
                 btn.BackgroundColor3 = (selectedTarget == p) and Color3.fromRGB(0,100,50) or Color3.fromRGB(20,20,20)
                 btn.Size = UDim2.new(1,-10,0,30)
-                btn.Position = UDim2.new(0,5,0,y)
                 btn.Text = p.Name
                 btn.TextColor3 = Color3.fromRGB(255,255,255)
                 btn.TextScaled = false
                 btn.TextSize = 18
                 btn.MouseButton1Click:Connect(function()
                     selectedTarget = p
-                    -- подсветка
                     for _, other in pairs(PlayersScroll:GetChildren()) do
                         if other:IsA("TextButton") then
                             other.BackgroundColor3 = Color3.fromRGB(20,20,20)
@@ -375,10 +357,8 @@ spawn(function()
                     end
                     btn.BackgroundColor3 = Color3.fromRGB(0,100,50)
                 end)
-                y = y + 35
             end
         end
-        PlayersScroll.CanvasSize = UDim2.new(0,0,0,y)
     end
 end)
 
@@ -480,4 +460,47 @@ UIS.InputBegan:Connect(function(input)
     end
 end)
 
-print("salt v2 полностью готов — меню должно работать")
+-- Кнопки Defense
+AntiGrabBtn.MouseButton1Click:Connect(function()
+    antiGrab = not antiGrab
+    AntiGrabBtn.BackgroundColor3 = antiGrab and Color3.fromRGB(0,255,128) or Color3.fromRGB(80,80,80)
+    AntiGrabBtn.Text = "Anti-Grab: " .. (antiGrab and "ON" or "OFF")
+end)
+
+BackTPBtn.MouseButton1Click:Connect(function()
+    backTP = not backTP
+    BackTPBtn.BackgroundColor3 = backTP and Color3.fromRGB(0,255,128) or Color3.fromRGB(80,80,80)
+    BackTPBtn.Text = "Back TP on Grab: " .. (backTP and "ON" or "OFF")
+end)
+
+-- Кнопки Misc
+TPBtn.MouseButton1Click:Connect(function()
+    if selectedTarget and selectedTarget.Character then
+        local hrp = Player.Character and Player.Character.HumanoidRootPart
+        if hrp then
+            hrp.CFrame = selectedTarget.Character.HumanoidRootPart.CFrame * CFrame.new(0,0,-6)
+        end
+    end
+end)
+
+TrackBtn.MouseButton1Click:Connect(function()
+    tracking = not tracking
+    TrackBtn.BackgroundColor3 = tracking and Color3.fromRGB(0,255,128) or Color3.fromRGB(80,80,80)
+    TrackBtn.Text = "Tracking: " .. (tracking and "ON" or "OFF")
+end)
+
+FlyBtn.MouseButton1Click:Connect(function()
+    flying = not flying
+    toggleFly(flying)
+    FlyBtn.BackgroundColor3 = flying and Color3.fromRGB(0,255,128) or Color3.fromRGB(80,80,80)
+    FlyBtn.Text = "Fly: " .. (flying and "ON" or "OFF")
+end)
+
+NoclipBtn.MouseButton1Click:Connect(function()
+    noclipping = not noclipping
+    toggleNoclip(noclipping)
+    NoclipBtn.BackgroundColor3 = noclipping and Color3.fromRGB(0,255,128) or Color3.fromRGB(80,80,80)
+    NoclipBtn.Text = "Noclip: " .. (noclipping and "ON" or "OFF")
+end)
+
+print("salt v2 готов — меню должно работать полностью")
