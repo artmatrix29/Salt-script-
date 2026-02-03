@@ -1,4 +1,4 @@
--- salt v2 (GUI controls for Fly & Noclip)
+-- salt v2 | Полный GUI-хаб для Fling Things and People (2026)
 
 local Players = game:GetService("Players")
 local UIS = game:GetService("UserInputService")
@@ -12,9 +12,11 @@ local Mouse = Player:GetMouse()
 
 local flying = false
 local noclipping = true
+local antiGrab = false
+local defenseTarget = nil
 local bodyVelocity, bodyGyro, noclipConn
 
--- Список игрушек (актуальный на 2026 из вики/скриптов)
+-- Игрушки (актуальный список)
 local TOY_NAMES = {
     "Missile", "Blobman", "Kunai", "Shuriken", "Smoke Bomb", "Unstable Substance",
     "Snowball", "Balloon", "Toy Frog", "Toy Tiger", "Toy Duck", "Toy Unicorn",
@@ -38,11 +40,11 @@ local MainFrame = Instance.new("Frame")
 MainFrame.Name = "Main"
 MainFrame.Parent = ScreenGui
 MainFrame.BackgroundColor3 = Color3.new(0,0,0)
-MainFrame.Position = UDim2.new(0.5, -250, 0.5, -200)
-MainFrame.Size = UDim2.new(0, 500, 0, 450)  -- чуть выше для кнопок
-MainFrame.Visible = true  -- тест; потом Insert
+MainFrame.Position = UDim2.new(0.5, -300, 0.5, -250)
+MainFrame.Size = UDim2.new(0, 600, 0, 500)
 MainFrame.Active = true
 MainFrame.Draggable = true
+MainFrame.Visible = true  -- для теста
 
 local UICorner = Instance.new("UICorner", MainFrame); UICorner.CornerRadius = UDim.new(0,12)
 
@@ -65,27 +67,85 @@ CloseBtn.TextColor3 = Color3.fromRGB(255,80,80)
 CloseBtn.TextScaled = true
 local cc = Instance.new("UICorner", CloseBtn); cc.CornerRadius = UDim.new(0,8)
 
--- Targets Scroll
+-- Вкладки
+local TabFrame = Instance.new("Frame")
+TabFrame.Parent = MainFrame
+TabFrame.BackgroundColor3 = Color3.fromRGB(20,20,20)
+TabFrame.Position = UDim2.new(0,10,0,60)
+TabFrame.Size = UDim2.new(1,-20,0,40)
+
+local Tabs = {
+    Target = Instance.new("TextButton", TabFrame),
+    Throw = Instance.new("TextButton", TabFrame),
+    Misc = Instance.new("TextButton", TabFrame)
+}
+
+local tabPages = {}
+local currentTab = "Target"
+
+local function createTab(name, x)
+    local btn = Tabs[name]
+    btn.Position = UDim2.new(x,0,0,0)
+    btn.Size = UDim2.new(0.33, -10,1,0)
+    btn.BackgroundColor3 = Color3.fromRGB(30,30,30)
+    btn.Text = name
+    btn.TextColor3 = Color3.fromRGB(0,255,128)
+    btn.TextScaled = true
+    btn.Font = Enum.Font.GothamBold
+    local cor = Instance.new("UICorner", btn); cor.CornerRadius = UDim.new(0,8)
+    
+    local page = Instance.new("Frame")
+    page.Parent = MainFrame
+    page.BackgroundTransparency = 1
+    page.Position = UDim2.new(0,10,0,110)
+    page.Size = UDim2.new(1,-20,1,-170)
+    page.Visible = false
+    tabPages[name] = page
+    
+    btn.MouseButton1Click:Connect(function()
+        for _, p in pairs(tabPages) do p.Visible = false end
+        tabPages[name].Visible = true
+        currentTab = name
+    end)
+end
+
+createTab("Target", 0)
+createTab("Throw", 0.33)
+createTab("Misc", 0.66)
+
+tabPages.Target.Visible = true  -- по умолчанию Target
+
+-- Target Page
 local TargetsScroll = Instance.new("ScrollingFrame")
-TargetsScroll.Parent = MainFrame
+TargetsScroll.Parent = tabPages.Target
 TargetsScroll.BackgroundColor3 = Color3.fromRGB(10,10,10)
-TargetsScroll.Position = UDim2.new(0.02,0,0.13,0)
-TargetsScroll.Size = UDim2.new(0.46,0,0.38,0)
+TargetsScroll.Size = UDim2.new(1,0,0.5,0)
 TargetsScroll.ScrollBarImageColor3 = Color3.fromRGB(0,255,128)
-TargetsScroll.CanvasSize = UDim2.new(0,0,0,0)
 
--- Toys Scroll
+local TPBtn = Instance.new("TextButton", tabPages.Target)
+TPBtn.BackgroundColor3 = Color3.fromRGB(0,255,128)
+TPBtn.Position = UDim2.new(0.05,0,0.55,0)
+TPBtn.Size = UDim2.new(0.9,0,0,50)
+TPBtn.Text = "TP to Selected Player"
+TPBtn.TextColor3 = Color3.new(0,0,0)
+TPBtn.TextScaled = true
+
+local DefenseBtn = Instance.new("TextButton", tabPages.Target)
+DefenseBtn.BackgroundColor3 = Color3.fromRGB(80,80,80)
+DefenseBtn.Position = UDim2.new(0.05,0,0.7,0)
+DefenseBtn.Size = UDim2.new(0.9,0,0,50)
+DefenseBtn.Text = "Defense: OFF (Anti-Grab)"
+DefenseBtn.TextColor3 = Color3.fromRGB(200,200,200)
+DefenseBtn.TextScaled = true
+
+-- Throw Page
 local ToysScroll = Instance.new("ScrollingFrame")
-ToysScroll.Parent = MainFrame
+ToysScroll.Parent = tabPages.Throw
 ToysScroll.BackgroundColor3 = Color3.fromRGB(10,10,10)
-ToysScroll.Position = UDim2.new(0.52,0,0.13,0)
-ToysScroll.Size = UDim2.new(0.46,0,0.38,0)
+ToysScroll.Size = UDim2.new(1,0,0.5,0)
 ToysScroll.ScrollBarImageColor3 = Color3.fromRGB(0,255,128)
-ToysScroll.CanvasSize = UDim2.new(0,0,0,0)
 
--- Power
-local PowerLabel = Instance.new("TextLabel")
-PowerLabel.Parent = MainFrame
+local PowerLabel = Instance.new("TextLabel", tabPages.Throw)
 PowerLabel.BackgroundTransparency = 1
 PowerLabel.Position = UDim2.new(0.05,0,0.55,0)
 PowerLabel.Size = UDim2.new(0.9,0,0,30)
@@ -93,100 +153,41 @@ PowerLabel.Text = "Power: 500"
 PowerLabel.TextColor3 = Color3.fromRGB(0,255,128)
 PowerLabel.TextScaled = true
 
-local SliderTrack = Instance.new("Frame")
-SliderTrack.Parent = MainFrame
+local SliderTrack = Instance.new("Frame", tabPages.Throw)
 SliderTrack.BackgroundColor3 = Color3.fromRGB(30,30,30)
 SliderTrack.Position = UDim2.new(0.05,0,0.62,0)
 SliderTrack.Size = UDim2.new(0.9,0,0,20)
 
-local SliderFill = Instance.new("Frame")
-SliderFill.Parent = SliderTrack
+local SliderFill = Instance.new("Frame", SliderTrack)
 SliderFill.BackgroundColor3 = Color3.fromRGB(0,255,128)
 SliderFill.Size = UDim2.new(0.1,0,1,0)
 
--- Кнопки Fly и Noclip в GUI
-local FlyBtn = Instance.new("TextButton")
-FlyBtn.Parent = MainFrame
-FlyBtn.BackgroundColor3 = Color3.fromRGB(80,80,80)  -- OFF по умолчанию
-FlyBtn.Position = UDim2.new(0.05,0,0.72,0)
-FlyBtn.Size = UDim2.new(0.42,0,0,50)
-FlyBtn.Font = Enum.Font.GothamBold
+local ThrowBtn = Instance.new("TextButton", tabPages.Throw)
+ThrowBtn.BackgroundColor3 = Color3.fromRGB(0,255,128)
+ThrowBtn.Position = UDim2.new(0.05,0,0.7,0)
+ThrowBtn.Size = UDim2.new(0.9,0,0,50)
+ThrowBtn.Text = "Throw 5x at Target"
+ThrowBtn.TextColor3 = Color3.new(0,0,0)
+ThrowBtn.TextScaled = true
+
+-- Misc Page
+local FlyBtn = Instance.new("TextButton", tabPages.Misc)
+FlyBtn.BackgroundColor3 = Color3.fromRGB(80,80,80)
+FlyBtn.Position = UDim2.new(0.05,0,0.1,0)
+FlyBtn.Size = UDim2.new(0.9,0,0,50)
 FlyBtn.Text = "Fly: OFF"
 FlyBtn.TextColor3 = Color3.fromRGB(200,200,200)
 FlyBtn.TextScaled = true
-local FlyCorner = Instance.new("UICorner", FlyBtn); FlyCorner.CornerRadius = UDim.new(0,10)
 
-local NoclipBtn = Instance.new("TextButton")
-NoclipBtn.Parent = MainFrame
-NoclipBtn.BackgroundColor3 = Color3.fromRGB(0,255,128)  -- ON по умолчанию
-NoclipBtn.Position = UDim2.new(0.53,0,0.72,0)
-NoclipBtn.Size = UDim2.new(0.42,0,0,50)
-NoclipBtn.Font = Enum.Font.GothamBold
+local NoclipBtn = Instance.new("TextButton", tabPages.Misc)
+NoclipBtn.BackgroundColor3 = Color3.fromRGB(0,255,128)
+NoclipBtn.Position = UDim2.new(0.05,0,0.25,0)
+NoclipBtn.Size = UDim2.new(0.9,0,0,50)
 NoclipBtn.Text = "Noclip: ON"
 NoclipBtn.TextColor3 = Color3.new(0,0,0)
 NoclipBtn.TextScaled = true
-local NoclipCorner = Instance.new("UICorner", NoclipBtn); NoclipCorner.CornerRadius = UDim.new(0,10)
 
--- Activate
-local ActivateBtn = Instance.new("TextButton")
-ActivateBtn.Parent = MainFrame
-ActivateBtn.BackgroundColor3 = Color3.fromRGB(0,255,128)
-ActivateBtn.Position = UDim2.new(0.1,0,0.88,0)
-ActivateBtn.Size = UDim2.new(0.8,0,0,50)
-ActivateBtn.Text = "АКТИВАТИРОВАТЬ (ТП + СПАВН)"
-ActivateBtn.TextColor3 = Color3.new(0,0,0)
-ActivateBtn.TextScaled = true
-
--- Fly toggle function
-local function toggleFly(state)
-    flying = state
-    local char = Player.Character
-    local root = char and char:FindFirstChild("HumanoidRootPart")
-    if not root then return end
-    if flying then
-        bodyVelocity = Instance.new("BodyVelocity", root)
-        bodyVelocity.MaxForce = Vector3.new(1e5,1e5,1e5)
-        bodyVelocity.Velocity = Vector3.new()
-        bodyGyro = Instance.new("BodyGyro", root)
-        bodyGyro.MaxTorque = Vector3.new(1e5,1e5,1e5)
-        spawn(function()
-            while flying and root.Parent do
-                local cam = WS.CurrentCamera
-                local move = Vector3.new()
-                if UIS:IsKeyDown(Enum.KeyCode.W) then move += cam.CFrame.LookVector end
-                if UIS:IsKeyDown(Enum.KeyCode.S) then move -= cam.CFrame.LookVector end
-                if UIS:IsKeyDown(Enum.KeyCode.A) then move -= cam.CFrame.RightVector end
-                if UIS:IsKeyDown(Enum.KeyCode.D) then move += cam.CFrame.RightVector end
-                if UIS:IsKeyDown(Enum.KeyCode.Space) then move += Vector3.new(0,1,0) end
-                if UIS:IsKeyDown(Enum.KeyCode.LeftControl) then move -= Vector3.new(0,1,0) end
-                bodyVelocity.Velocity = move * 80
-                bodyGyro.CFrame = cam.CFrame
-                RS.Heartbeat:Wait()
-            end
-        end)
-    else
-        if bodyVelocity then bodyVelocity:Destroy() end
-        if bodyGyro then bodyGyro:Destroy() end
-    end
-end
-
--- Noclip toggle
-local function toggleNoclip(state)
-    noclipping = state
-    if noclipConn then noclipConn:Disconnect() end
-    if noclipping then
-        noclipConn = RS.Stepped:Connect(function()
-            local char = Player.Character
-            if char then
-                for _, part in pairs(char:GetDescendants()) do
-                    if part:IsA("BasePart") then part.CanCollide = false end
-                end
-            end
-        end)
-    end
-end
-
--- Super Throw (RMB stronger)
+-- Super Throw (RMB)
 local superStrength = 1500
 WS.ChildAdded:Connect(function(child)
     if child.Name == "GrabParts" then
@@ -210,7 +211,24 @@ WS.ChildAdded:Connect(function(child)
     end
 end)
 
--- Update functions (как раньше)
+-- Defense Anti-Grab
+spawn(function()
+    while true do
+        wait(0.1)
+        if defenseTarget and defenseTarget.Character then
+            local root = defenseTarget.Character:FindFirstChild("HumanoidRootPart")
+            if root then
+                for _, part in pairs(root:GetDescendants()) do
+                    if part:IsA("WeldConstraint") and part.Part1 == Player.Character then
+                        root.AssemblyLinearVelocity = root.AssemblyLinearVelocity + Vector3.new(0,0, -500)  -- отбрасывает назад
+                    end
+                end
+            end
+        end
+    end
+end)
+
+-- Functions
 local function updatePlayers()
     for _, b in pairs(TargetsScroll:GetChildren()) do if b:IsA("TextButton") then b:Destroy() end end
     local y = 0
@@ -255,7 +273,7 @@ local function updateToys()
     ToysScroll.CanvasSize = UDim2.new(0,0,0,y)
 end
 
--- Slider
+-- Power slider
 local dragging = false
 SliderTrack.InputBegan:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 then dragging = true end end)
 UIS.InputEnded:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end end)
@@ -268,12 +286,23 @@ RS.RenderStepped:Connect(function()
     end
 end)
 
--- Activate (ТП + спавн)
-ActivateBtn.MouseButton1Click:Connect(function()
+-- Buttons
+TPBtn.MouseButton1Click:Connect(function()
+    if selectedTarget and selectedTarget.Character then
+        local hrp = Player.Character and Player.Character.HumanoidRootPart
+        if hrp then hrp.CFrame = selectedTarget.Character.HumanoidRootPart.CFrame * CFrame.new(0,0,-5) end
+    end
+end)
+
+DefenseBtn.MouseButton1Click:Connect(function()
+    antiGrab = not antiGrab
+    defenseTarget = antiGrab and Player or nil
+    DefenseBtn.BackgroundColor3 = antiGrab and Color3.fromRGB(0,255,128) or Color3.fromRGB(80,80,80)
+    DefenseBtn.Text = "Defense: " .. (antiGrab and "ON" or "OFF")
+end)
+
+ThrowBtn.MouseButton1Click:Connect(function()
     if not selectedTarget or not selectedToyName then return end
-    local hrp = Player.Character and Player.Character:FindFirstChild("HumanoidRootPart")
-    if hrp then hrp.CFrame = selectedTarget.Character.HumanoidRootPart.CFrame * CFrame.new(0,0,-6) end
-    
     local pos = selectedTarget.Character.HumanoidRootPart.Position
     for i=1,5 do
         local toy = ReplicatedStorage:FindFirstChild(selectedToyName, true) or WS:FindFirstChild(selectedToyName, true)
@@ -282,39 +311,67 @@ ActivateBtn.MouseButton1Click:Connect(function()
             clone.Parent = WS
             local part = clone.PrimaryPart or clone:FindFirstChildWhichIsA("BasePart")
             if part then
-                part.CFrame = CFrame.new(pos + Vector3.new(math.random(-5,5),10,math.random(-5,5)))
+                part.CFrame = CFrame.new(pos + Vector3.new(math.random(-10,10),10,math.random(-10,10)))
                 local bv = Instance.new("BodyVelocity", part)
-                bv.Velocity = WS.CurrentCamera.CFrame.LookVector * powerValue + Vector3.new(0, powerValue*0.4, 0)
+                bv.Velocity = WS.CurrentCamera.CFrame.LookVector * powerValue + Vector3.new(0, powerValue*0.5, 0)
                 bv.MaxForce = Vector3.new(1e6,1e6,1e6)
                 Debris:AddItem(bv,2)
-                Debris:AddItem(clone,8)
+                Debris:AddItem(clone,10)
             end
         end
     end
 end)
 
--- GUI buttons
 FlyBtn.MouseButton1Click:Connect(function()
-    toggleFly(not flying)
+    flying = not flying
+    local char = Player.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    if root then
+        if flying then
+            bodyVelocity = Instance.new("BodyVelocity", root)
+            bodyVelocity.MaxForce = Vector3.new(1e5,1e5,1e5)
+            bodyVelocity.Velocity = Vector3.new()
+            bodyGyro = Instance.new("BodyGyro", root)
+            bodyGyro.MaxTorque = Vector3.new(1e5,1e5,1e5)
+            spawn(function()
+                while flying do
+                    local cam = WS.CurrentCamera
+                    local move = Vector3.new()
+                    if UIS:IsKeyDown(Enum.KeyCode.W) then move += cam.CFrame.LookVector end
+                    if UIS:IsKeyDown(Enum.KeyCode.S) then move -= cam.CFrame.LookVector end
+                    if UIS:IsKeyDown(Enum.KeyCode.A) then move -= cam.CFrame.RightVector end
+                    if UIS:IsKeyDown(Enum.KeyCode.D) then move += cam.CFrame.RightVector end
+                    if UIS:IsKeyDown(Enum.KeyCode.Space) then move += Vector3.new(0,1,0) end
+                    if UIS:IsKeyDown(Enum.KeyCode.LeftControl) then move -= Vector3.new(0,1,0) end
+                    bodyVelocity.Velocity = move * 80
+                    bodyGyro.CFrame = cam.CFrame
+                    RS.Heartbeat:Wait()
+                end
+            end)
+        else
+            if bodyVelocity then bodyVelocity:Destroy() end
+            if bodyGyro then bodyGyro:Destroy() end
+        end
+    end
     FlyBtn.BackgroundColor3 = flying and Color3.fromRGB(0,255,128) or Color3.fromRGB(80,80,80)
     FlyBtn.Text = "Fly: " .. (flying and "ON" or "OFF")
 end)
 
 NoclipBtn.MouseButton1Click:Connect(function()
-    toggleNoclip(not noclipping)
+    noclipping = not noclipping
+    if noclipConn then noclipConn:Disconnect() end
+    if noclipping then
+        noclipConn = RS.Stepped:Connect(function()
+            local char = Player.Character
+            if char then
+                for _, part in pairs(char:GetDescendants()) do
+                    if part:IsA("BasePart") then part.CanCollide = false end
+                end
+            end
+        end)
+    end
     NoclipBtn.BackgroundColor3 = noclipping and Color3.fromRGB(0,255,128) or Color3.fromRGB(80,80,80)
     NoclipBtn.Text = "Noclip: " .. (noclipping and "ON" or "OFF")
-end)
-
--- Insert toggle
-UIS.InputBegan:Connect(function(input)
-    if input.KeyCode == Enum.KeyCode.Insert then
-        MainFrame.Visible = not MainFrame.Visible
-        if MainFrame.Visible then
-            updatePlayers()
-            updateToys()
-        end
-    end
 end)
 
 -- Auto update
@@ -325,9 +382,17 @@ spawn(function()
     end
 end)
 
--- Init
 updatePlayers()
 updateToys()
-toggleNoclip(true)  -- noclip ON по умолчанию
+
+-- Insert toggle
+UIS.InputBegan:Connect(function(input)
+    if input.KeyCode == Enum.KeyCode.Insert then
+        MainFrame.Visible = not MainFrame.Visible
+    end
+end)
+
+-- Init
+toggleNoclip(true)
 NoclipBtn.BackgroundColor3 = Color3.fromRGB(0,255,128)
 NoclipBtn.Text = "Noclip: ON"
