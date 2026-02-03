@@ -1,289 +1,44 @@
--- salt v2 | Полный хаб с вкладками Defense, Attack, Misc
+print("=== salt v2 TEST START ===")
 
-local Players = game:GetService("Players")
-local UIS = game:GetService("UserInputService")
-local RS = game:GetService("RunService")
-local WS = game:GetService("Workspace")
-local Debris = game:GetService("Debris")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Player = game.Players.LocalPlayer
+local PlayerGui = Player:WaitForChild("PlayerGui", 15)
 
-local Player = Players.LocalPlayer
-local Mouse = Player:GetMouse()
-
-local flying = false
-local noclipping = false
-local antiGrab = false
-local backTP = false
-local grabReach = 100  -- по умолчанию
-local pullStrength = 10  -- по умолчанию
-local throwStrength = 1500  -- по умолчанию
-local tracking = false
-local selectedTarget = nil
-local tpKey = Enum.KeyCode.Z
-
-print("salt v2 loaded - checking GUI")
-
-local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "saltv2"
-ScreenGui.ResetOnSpawn = false
-ScreenGui.DisplayOrder = 9999
-ScreenGui.IgnoreGuiInset = true
-ScreenGui.Parent = Player:WaitForChild("PlayerGui", 10)  -- ждём загрузку
-
-print("PlayerGui found, creating MainFrame")
-
-local MainFrame = Instance.new("Frame")
-MainFrame.Name = "Main"
-MainFrame.Parent = ScreenGui
-MainFrame.BackgroundColor3 = Color3.new(0,0,0)
-MainFrame.Position = UDim2.new(0.5, -250, 0.5, -200)
-MainFrame.Size = UDim2.new(0, 500, 0, 450)
-MainFrame.Active = true
-MainFrame.Draggable = true
-MainFrame.Visible = true
-
-print("MainFrame created")
-
-local UICorner = Instance.new("UICorner", MainFrame)
-UICorner.CornerRadius = UDim.new(0,12)
-
-local Title = Instance.new("TextLabel")
-Title.Parent = MainFrame
-Title.BackgroundTransparency = 1
-Title.Size = UDim2.new(1,0,0,50)
-Title.Font = Enum.Font.GothamBold
-Title.Text = "salt v2"
-Title.TextColor3 = Color3.fromRGB(0,255,128)
-Title.TextScaled = true
-
-local CloseBtn = Instance.new("TextButton")
-CloseBtn.Parent = MainFrame
-CloseBtn.BackgroundColor3 = Color3.fromRGB(40,40,40)
-CloseBtn.Position = UDim2.new(1,-45,0,8)
-CloseBtn.Size = UDim2.new(0,35,0,35)
-CloseBtn.Text = "X"
-CloseBtn.TextColor3 = Color3.fromRGB(255,80,80)
-CloseBtn.TextScaled = true
-local cc = Instance.new("UICorner", CloseBtn)
-cc.CornerRadius = UDim.new(0,8)
-
--- Вкладки
-local TabFrame = Instance.new("Frame")
-TabFrame.Parent = MainFrame
-TabFrame.BackgroundColor3 = Color3.fromRGB(20,20,20)
-TabFrame.Position = UDim2.new(0,10,0,60)
-TabFrame.Size = UDim2.new(1,-20,0,40)
-
-local DefenseBtn = Instance.new("TextButton", TabFrame)
-DefenseBtn.Position = UDim2.new(0,0,0,0)
-DefenseBtn.Size = UDim2.new(0.33,0,1,0)
-DefenseBtn.BackgroundColor3 = Color3.fromRGB(30,30,30)
-DefenseBtn.Text = "Defense"
-DefenseBtn.TextColor3 = Color3.fromRGB(0,255,128)
-DefenseBtn.TextScaled = true
-DefenseBtn.Font = Enum.Font.GothamBold
-
-local AttackBtn = Instance.new("TextButton", TabFrame)
-AttackBtn.Position = UDim2.new(0.33,0,0,0)
-AttackBtn.Size = UDim2.new(0.33,0,1,0)
-AttackBtn.BackgroundColor3 = Color3.fromRGB(30,30,30)
-AttackBtn.Text = "Attack"
-AttackBtn.TextColor3 = Color3.fromRGB(0,255,128)
-AttackBtn.TextScaled = true
-AttackBtn.Font = Enum.Font.GothamBold
-
-local MiscBtn = Instance.new("TextButton", TabFrame)
-MiscBtn.Position = UDim2.new(0.66,0,0,0)
-MiscBtn.Size = UDim2.new(0.34,0,1,0)
-MiscBtn.BackgroundColor3 = Color3.fromRGB(30,30,30)
-MiscBtn.Text = "Misc"
-MiscBtn.TextColor3 = Color3.fromRGB(0,255,128)
-MiscBtn.TextScaled = true
-MiscBtn.Font = Enum.Font.GothamBold
-
-local DefensePage = Instance.new("Frame")
-DefensePage.Parent = MainFrame
-DefensePage.BackgroundTransparency = 1
-DefensePage.Position = UDim2.new(0,10,0,110)
-DefensePage.Size = UDim2.new(1,-20,1,-170)
-DefensePage.Visible = true  -- по умолчанию
-
-local AttackPage = Instance.new("Frame")
-AttackPage.Parent = MainFrame
-AttackPage.BackgroundTransparency = 1
-AttackPage.Position = UDim2.new(0,10,0,110)
-AttackPage.Size = UDim2.new(1,-20,1,-170)
-AttackPage.Visible = false
-
-local MiscPage = Instance.new("Frame")
-MiscPage.Parent = MainFrame
-MiscPage.BackgroundTransparency = 1
-MiscPage.Position = UDim2.new(0,10,0,110)
-MiscPage.Size = UDim2.new(1,-20,1,-170)
-MiscPage.Visible = false
-
-DefenseBtn.MouseButton1Click:Connect(function()
-    DefensePage.Visible = true
-    AttackPage.Visible = false
-    MiscPage.Visible = false
-end)
-
-AttackBtn.MouseButton1Click:Connect(function()
-    DefensePage.Visible = false
-    AttackPage.Visible = true
-    MiscPage.Visible = false
-end)
-
-MiscBtn.MouseButton1Click:Connect(function()
-    DefensePage.Visible = false
-    AttackPage = false
-    MiscPage.Visible = true
-end)
-
--- Defense Page
-local AntiGrabBtn = Instance.new("TextButton", DefensePage)
-AntiGrabBtn.BackgroundColor3 = Color3.fromRGB(80,80,80)
-AntiGrabBtn.Position = UDim2.new(0.05,0,0.1,0)
-AntiGrabBtn.Size = UDim2.new(0.9,0,0,50)
-AntiGrabBtn.Text = "Anti-Grab: OFF"
-AntiGrabBtn.TextColor3 = Color3.fromRGB(200,200,200)
-AntiGrabBtn.TextScaled = true
-
-local BackTPBtn = Instance.new("TextButton", DefensePage)
-BackTPBtn.BackgroundColor3 = Color3.fromRGB(80,80,80)
-BackTPBtn.Position = UDim2.new(0.05,0,0.25,0)
-BackTPBtn.Size = UDim2.new(0.9,0,0,50)
-BackTPBtn.Text = "Back TP on Grab: OFF"
-BackTPBtn.TextColor3 = Color3.fromRGB(200,200,200)
-BackTPBtn.TextScaled = true
-
--- Attack Page
-local ReachLabel = Instance.new("TextLabel", AttackPage)
-ReachLabel.BackgroundTransparency = 1
-ReachLabel.Position = UDim2.new(0.05,0,0.1,0)
-ReachLabel.Size = UDim2.new(0.9,0,0,30)
-ReachLabel.Text = "Grab Reach: 100"
-ReachLabel.TextColor3 = Color3.fromRGB(0,255,128)
-ReachLabel.TextScaled = true
-
-local SliderTrackReach = Instance.new("Frame", AttackPage)
-SliderTrackReach.BackgroundColor3 = Color3.fromRGB(30,30,30)
-SliderTrackReach.Position = UDim2.new(0.05,0,0.15,0)
-SliderTrackReach.Size = UDim2.new(0.9,0,0,20)
-
-local SliderFillReach = Instance.new("Frame", SliderTrackReach)
-SliderFillReach.BackgroundColor3 = Color3.fromRGB(0,255,128)
-SliderFillReach.Size = UDim2.new(0.5,0,1,0)
-
-local PullLabel = Instance.new("TextLabel", AttackPage)
-PullLabel.BackgroundTransparency = 1
-PullLabel.Position = UDim2.new(0.05,0,0.25,0)
-PullLabel.Size = UDim2.new(0.9,0,0,30)
-PullLabel.Text = "Pull Strength: 10"
-PullLabel.TextColor3 = Color3.fromRGB(0,255,128)
-PullLabel.TextScaled = true
-
-local SliderTrackPull = Instance.new("Frame", AttackPage)
-SliderTrackPull.BackgroundColor3 = Color3.fromRGB(30,30,30)
-SliderTrackPull.Position = UDim2.new(0.05,0,0.3,0)
-SliderTrackPull.Size = UDim2.new(0.9,0,0,20)
-
-local SliderFillPull = Instance.new("Frame", SliderTrackPull)
-SliderFillPull.BackgroundColor3 = Color3.fromRGB(0,255,128)
-SliderFillPull.Size = UDim2.new(0.5,0,1,0)
-
-local ThrowLabel = Instance.new("TextLabel", AttackPage)
-ThrowLabel.BackgroundTransparency = 1
-ThrowLabel.Position = UDim2.new(0.05,0,0.4,0)
-ThrowLabel.Size = UDim2.new(0.9,0,0,30)
-ThrowLabel.Text = "Throw Strength: 1500"
-ThrowLabel.TextColor3 = Color3.fromRGB(0,255,128)
-ThrowLabel.TextScaled = true
-
-local SliderTrackThrow = Instance.new("Frame", AttackPage)
-SliderTrackThrow.BackgroundColor3 = Color3.fromRGB(30,30,30)
-SliderTrackThrow.Position = UDim2.new(0.05,0,0.45,0)
-SliderTrackThrow.Size = UDim2.new(0.9,0,0,20)
-
-local SliderFillThrow = Instance.new("Frame", SliderTrackThrow)
-SliderFillThrow.BackgroundColor3 = Color3.fromRGB(0,255,128)
-SliderFillThrow.Size = UDim2.new(0.5,0,1,0)
-
--- Misc Page
-local MiscPlayersScroll = Instance.new("ScrollingFrame", MiscPage)
-MiscPlayersScroll.BackgroundColor3 = Color3.fromRGB(10,10,10)
-MiscPlayersScroll.Position = UDim2.new(0.05,0,0.1,0)
-MiscPlayersScroll.Size = UDim2.new(0.9,0,0.3,0)
-MiscPlayersScroll.ScrollBarImageColor3 = Color3.fromRGB(0,255,128)
-MiscPlayersScroll.CanvasSize = UDim2.new(0,0,0,0)
-
-local MiscTPBtn = Instance.new("TextButton", MiscPage)
-MiscTPBtn.BackgroundColor3 = Color3.fromRGB(0,255,128)
-MiscTPBtn.Position = UDim2.new(0.05,0,0.45,0)
-MiscTPBtn.Size = UDim2.new(0.9,0,0,50)
-MiscTPBtn.Text = "TP to Selected"
-MiscTPBtn.TextColor3 = Color3.new(0,0,0)
-MiscTPBtn.TextScaled = true
-
-local TrackingBtn = Instance.new("TextButton", MiscPage)
-TrackingBtn.BackgroundColor3 = Color3.fromRGB(80,80,80)
-TrackingBtn.Position = UDim2.new(0.05,0,0.55,0)
-TrackingBtn.Size = UDim2.new(0.9,0,0,50)
-TrackingBtn.Text = "Tracking: OFF"
-TrackingBtn.TextColor3 = Color3.fromRGB(200,200,200)
-TrackingBtn.TextScaled = true
-
-local FlyBtn = Instance.new("TextButton", MiscPage)
-FlyBtn.BackgroundColor3 = Color3.fromRGB(80,80,80)
-FlyBtn.Position = UDim2.new(0.05,0,0.65,0)
-FlyBtn.Size = UDim2.new(0.9,0,0,50)
-FlyBtn.Text = "Fly: OFF"
-FlyBtn.TextColor3 = Color3.fromRGB(200,200,200)
-FlyBtn.TextScaled = true
-
-local NoclipBtn = Instance.new("TextButton", MiscPage)
-NoclipBtn.BackgroundColor3 = Color3.fromRGB(80,80,80)
-NoclipBtn.Position = UDim2.new(0.05,0,0.75,0)
-NoclipBtn.Size = UDim2.new(0.9,0,0,50)
-NoclipBtn.Text = "Noclip: OFF"
-NoclipBtn.TextColor3 = Color3.fromRGB(200,200,200)
-NoclipBtn.TextScaled = true
-
--- Функции
-local function updatePlayers(scroll)
-    for _, b in pairs(scroll:GetChildren()) do if b:IsA("TextButton") then b:Destroy() end end
-    local y = 0
-    for _, p in pairs(Players:GetPlayers()) do
-        if p ~= Player and p.Character then
-            local btn = Instance.new("TextButton")
-            btn.Parent = scroll
-            btn.BackgroundColor3 = (selectedTarget == p) and Color3.fromRGB(0,100,50) or Color3.fromRGB(20,20,20)
-            btn.Size = UDim2.new(1,-10,0,30)
-            btn.Position = UDim2.new(0,5,0,y)
-            btn.Text = p.Name
-            btn.TextColor3 = Color3.fromRGB(255,255,255)
-            btn.TextScaled = true
-            btn.MouseButton1Click:Connect(function()
-                selectedTarget = p
-                updatePlayers(scroll)
-            end
-            y = y + 35
-        end
-    end
-    scroll.CanvasSize = UDim2.new(0,0,0,y)
+if not PlayerGui then
+    print("ERROR: PlayerGui не найден за 15 сек!")
+    return
 end
 
--- Инит
-updatePlayers(MiscPlayersScroll)
-print("GUI loaded - menu should appear")
+print("PlayerGui найден")
 
--- Закрытие и toggle
-CloseBtn.MouseButton1Click:Connect(function()
-    MainFrame.Visible = false
-end)
+local sg = Instance.new("ScreenGui")
+sg.Name = "saltv2_test"
+sg.ResetOnSpawn = false
+sg.DisplayOrder = 10000
+sg.IgnoreGuiInset = true
+sg.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+sg.Parent = PlayerGui
 
-UIS.InputBegan:Connect(function(input)
-    if input.KeyCode == Enum.KeyCode.Insert then
-        MainFrame.Visible = not MainFrame.Visible
-    end
-end)
+print("ScreenGui создан и привязан")
+
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 400, 0, 300)
+frame.Position = UDim2.new(0.5, -200, 0.5, -150)
+frame.BackgroundColor3 = Color3.fromRGB(20, 20, 30)
+frame.BorderSizePixel = 0
+frame.Parent = sg
+
+local corner = Instance.new("UICorner")
+corner.CornerRadius = UDim.new(0, 16)
+corner.Parent = frame
+
+local text = Instance.new("TextLabel")
+text.Size = UDim2.new(1, 0, 1, 0)
+text.BackgroundTransparency = 1
+text.Text = "salt v2\n\nЕсли видишь это окно — GUI работает\n\nТеперь проблема в сложном коде"
+text.TextColor3 = Color3.fromRGB(0, 255, 128)
+text.TextScaled = true
+text.Font = Enum.Font.GothamBold
+text.Parent = frame
+
+print("=== salt v2 TEST WINDOW CREATED ===")
+print("Если окно не видно — проблема в executor'e или игре. Проверь консоль.")
