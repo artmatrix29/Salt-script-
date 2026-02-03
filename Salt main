@@ -1,4 +1,4 @@
--- salt v2 | fixed & stable UI build
+-- salt v2 | clean rebuild
 
 local Players = game:GetService("Players")
 local UIS = game:GetService("UserInputService")
@@ -8,90 +8,88 @@ local WS = game:GetService("Workspace")
 local Player = Players.LocalPlayer
 local Mouse = Player:GetMouse()
 
--- STATES
-local flying, noclipping, antiGrab, backTP, tracking = false,false,false,false,false
-local selectedTarget = nil
+-- state
+local antiGrab = false
+local backTP = false
+local flying = false
+local noclip = false
+local tracking = false
+local selectedTarget
 
-local grabReach, pullStrength, throwStrength = 100,10,1500
-local tpKey = Enum.KeyCode.Z
+local grabReach = 100
+local pullStrength = 10
+local throwStrength = 1500
 
--- GUI ROOT
-local ScreenGui = Instance.new("ScreenGui", Player.PlayerGui)
-ScreenGui.Name = "saltv2"
-ScreenGui.IgnoreGuiInset = true
-ScreenGui.ResetOnSpawn = false
-ScreenGui.DisplayOrder = 9999
+--------------------------------------------------
+-- GUI
+--------------------------------------------------
 
-local Main = Instance.new("Frame", ScreenGui)
-Main.Size = UDim2.new(0,500,0,520)
-Main.Position = UDim2.new(0.5,-250,0.5,-260)
-Main.BackgroundColor3 = Color3.new(0,0,0)
-Main.Active = true
-Main.Draggable = true
-Main.ZIndex = 1
+local gui = Instance.new("ScreenGui", Player.PlayerGui)
+gui.Name = "saltv2"
+gui.ResetOnSpawn = false
+gui.DisplayOrder = 9999
 
-Instance.new("UICorner", Main).CornerRadius = UDim.new(0,12)
+local main = Instance.new("Frame", gui)
+main.Size = UDim2.new(0,500,0,520)
+main.Position = UDim2.new(0.5,-250,0.5,-260)
+main.BackgroundColor3 = Color3.fromRGB(15,15,15)
+main.Active = true
+main.Draggable = true
 
--- TITLE
-local Title = Instance.new("TextLabel", Main)
-Title.Size = UDim2.new(1,0,0,50)
-Title.BackgroundTransparency = 1
-Title.Text = "salt v2"
-Title.TextColor3 = Color3.fromRGB(0,255,128)
-Title.Font = Enum.Font.GothamBold
-Title.TextSize = 24
-Title.ZIndex = 2
+Instance.new("UICorner", main).CornerRadius = UDim.new(0,12)
 
--- CLOSE
-local Close = Instance.new("TextButton", Main)
-Close.Size = UDim2.new(0,35,0,35)
-Close.Position = UDim2.new(1,-45,0,8)
-Close.Text = "X"
-Close.TextColor3 = Color3.fromRGB(255,80,80)
-Close.BackgroundColor3 = Color3.fromRGB(40,40,40)
-Close.ZIndex = 3
-Close.MouseButton1Click:Connect(function()
-	Main.Visible = false
-end)
+local title = Instance.new("TextLabel", main)
+title.Size = UDim2.new(1,0,0,45)
+title.BackgroundTransparency = 1
+title.Text = "salt v2"
+title.TextColor3 = Color3.fromRGB(0,255,128)
+title.TextSize = 24
+title.Font = Enum.Font.GothamBold
 
--- TABS
-local Tabs = Instance.new("Frame", Main)
-Tabs.Position = UDim2.new(0,10,0,60)
-Tabs.Size = UDim2.new(1,-20,0,40)
-Tabs.BackgroundColor3 = Color3.fromRGB(20,20,20)
-Tabs.ZIndex = 2
+--------------------------------------------------
+-- Tabs
+--------------------------------------------------
 
-local function tab(text,pos)
-	local b = Instance.new("TextButton", Tabs)
+local tabBar = Instance.new("Frame", main)
+tabBar.Position = UDim2.new(0,10,0,55)
+tabBar.Size = UDim2.new(1,-20,0,40)
+tabBar.BackgroundColor3 = Color3.fromRGB(25,25,25)
+
+local function tab(text,x)
+	local b = Instance.new("TextButton", tabBar)
 	b.Size = UDim2.new(0.33,0,1,0)
-	b.Position = pos
+	b.Position = UDim2.new(x,0,0,0)
 	b.Text = text
-	b.BackgroundColor3 = Color3.fromRGB(30,30,30)
-	b.TextColor3 = Color3.fromRGB(0,255,128)
 	b.TextSize = 18
-	b.ZIndex = 3
+	b.TextColor3 = Color3.fromRGB(0,255,128)
+	b.BackgroundColor3 = Color3.fromRGB(35,35,35)
 	return b
 end
 
-local DefenseTab = tab("Defense",UDim2.new(0,0,0,0))
-local AttackTab  = tab("Attack", UDim2.new(0.33,0,0,0))
-local MiscTab    = tab("Misc",   UDim2.new(0.66,0,0,0))
+local DefenseTab = tab("Defense",0)
+local AttackTab  = tab("Attack",0.33)
+local MiscTab    = tab("Misc",0.66)
 
--- PAGES
+--------------------------------------------------
+-- Pages
+--------------------------------------------------
+
 local function page()
-	local f = Instance.new("Frame", Main)
-	f.Position = UDim2.new(0,10,0,110)
-	f.Size = UDim2.new(1,-20,1,-170)
+	local f = Instance.new("Frame", main)
+	f.Position = UDim2.new(0,10,0,105)
+	f.Size = UDim2.new(1,-20,1,-115)
 	f.BackgroundTransparency = 1
 	f.Visible = false
 	f.Active = false
-	f.ZIndex = 2
 	return f
 end
 
 local DefensePage = page()
 local AttackPage  = page()
 local MiscPage    = page()
+
+DefensePage.Visible = true
+DefensePage.Active = true
 
 local function show(p)
 	for _,v in ipairs({DefensePage,AttackPage,MiscPage}) do
@@ -102,79 +100,125 @@ local function show(p)
 	p.Active = true
 end
 
-show(DefensePage)
-
 DefenseTab.MouseButton1Click:Connect(function() show(DefensePage) end)
 AttackTab.MouseButton1Click:Connect(function() show(AttackPage) end)
 MiscTab.MouseButton1Click:Connect(function() show(MiscPage) end)
 
--- DEFENSE BUTTONS
-local function defBtn(text,y)
+--------------------------------------------------
+-- DEFENSE
+--------------------------------------------------
+
+local function defBtn(text,y,callback)
 	local b = Instance.new("TextButton", DefensePage)
 	b.Size = UDim2.new(0.9,0,0,45)
 	b.Position = UDim2.new(0.05,0,y,0)
 	b.BackgroundColor3 = Color3.fromRGB(80,80,80)
-	b.TextColor3 = Color3.fromRGB(200,200,200)
-	b.TextSize = 18
 	b.Text = text
-	b.ZIndex = 3
-	return b
+	b.TextSize = 18
+	b.TextColor3 = Color3.fromRGB(200,200,200)
+	b.MouseButton1Click:Connect(callback)
 end
 
-local AntiGrabBtn = defBtn("Anti-Grab: OFF",0.05)
-local BackTPBtn   = defBtn("Back TP on Grab: OFF",0.2)
-
-AntiGrabBtn.MouseButton1Click:Connect(function()
+defBtn("Anti-Grab: OFF",0.05,function(btn)
 	antiGrab = not antiGrab
-	AntiGrabBtn.Text = "Anti-Grab: "..(antiGrab and "ON" or "OFF")
-	AntiGrabBtn.BackgroundColor3 = antiGrab and Color3.fromRGB(0,255,128) or Color3.fromRGB(80,80,80)
+	btn.BackgroundColor3 = antiGrab and Color3.fromRGB(0,255,128) or Color3.fromRGB(80,80,80)
+	btn.Text = "Anti-Grab: "..(antiGrab and "ON" or "OFF")
 end)
 
-BackTPBtn.MouseButton1Click:Connect(function()
+defBtn("Back TP on Grab: OFF",0.18,function(btn)
 	backTP = not backTP
-	BackTPBtn.Text = "Back TP on Grab: "..(backTP and "ON" or "OFF")
-	BackTPBtn.BackgroundColor3 = backTP and Color3.fromRGB(0,255,128) or Color3.fromRGB(80,80,80)
+	btn.BackgroundColor3 = backTP and Color3.fromRGB(0,255,128) or Color3.fromRGB(80,80,80)
+	btn.Text = "Back TP on Grab: "..(backTP and "ON" or "OFF")
 end)
 
+--------------------------------------------------
+-- ATTACK (SLIDERS)
+--------------------------------------------------
+
+local function slider(label,y,min,max,set)
+	local t = Instance.new("TextLabel", AttackPage)
+	t.Size = UDim2.new(0.9,0,0,30)
+	t.Position = UDim2.new(0.05,0,y,0)
+	t.BackgroundTransparency = 1
+	t.TextColor3 = Color3.fromRGB(0,255,128)
+	t.TextSize = 18
+
+	local bar = Instance.new("Frame", AttackPage)
+	bar.Size = UDim2.new(0.9,0,0,20)
+	bar.Position = UDim2.new(0.05,0,y+0.07,0)
+	bar.BackgroundColor3 = Color3.fromRGB(30,30,30)
+
+	local fill = Instance.new("Frame", bar)
+	fill.BackgroundColor3 = Color3.fromRGB(0,255,128)
+	fill.Size = UDim2.new(0.5,0,1,0)
+
+	local drag = false
+	bar.InputBegan:Connect(function(i)
+		if i.UserInputType==Enum.UserInputType.MouseButton1 then drag=true end
+	end)
+	UIS.InputEnded:Connect(function(i)
+		if i.UserInputType==Enum.UserInputType.MouseButton1 then drag=false end
+	end)
+
+	RS.RenderStepped:Connect(function()
+		if drag then
+			local r = math.clamp((Mouse.X-bar.AbsolutePosition.X)/bar.AbsoluteSize.X,0,1)
+			fill.Size = UDim2.new(r,0,1,0)
+			local v = math.floor(min+(max-min)*r)
+			t.Text = label..": "..v
+			set(v)
+		end
+	end)
+end
+
+slider("Grab Reach",0.05,50,1000,function(v) grabReach=v end)
+slider("Pull Strength",0.28,5,100,function(v) pullStrength=v end)
+slider("Throw Strength (RMB)",0.51,500,5000,function(v) throwStrength=v end)
+
+--------------------------------------------------
 -- MISC
+--------------------------------------------------
+
 local layout = Instance.new("UIListLayout", MiscPage)
 layout.Padding = UDim.new(0,10)
 layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 
-local function miscBtn(text)
+local function miscBtn(text,cb)
 	local b = Instance.new("TextButton", MiscPage)
 	b.Size = UDim2.new(0.9,0,0,45)
 	b.BackgroundColor3 = Color3.fromRGB(80,80,80)
-	b.TextColor3 = Color3.fromRGB(200,200,200)
-	b.TextSize = 18
 	b.Text = text
-	b.ZIndex = 3
+	b.TextSize = 18
+	b.TextColor3 = Color3.fromRGB(200,200,200)
+	b.MouseButton1Click:Connect(cb)
 	return b
 end
 
-local TPBtn     = miscBtn("TP to Selected")
-local TrackBtn  = miscBtn("Tracking: OFF")
-local FlyBtn    = miscBtn("Fly: OFF")
-local NoclipBtn = miscBtn("Noclip: OFF")
-
--- SCROLL
-local PlayersScroll = Instance.new("ScrollingFrame", MiscPage)
-PlayersScroll.Size = UDim2.new(0.9,0,0.35,0)
-PlayersScroll.CanvasSize = UDim2.new(0,0,0,0)
-PlayersScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
-PlayersScroll.BackgroundColor3 = Color3.fromRGB(10,10,10)
-PlayersScroll.ScrollBarImageColor3 = Color3.fromRGB(0,255,128)
-PlayersScroll.ClipsDescendants = true
-PlayersScroll.ZIndex = 3
-
-Instance.new("UIListLayout", PlayersScroll)
-
--- TP BUTTON
-TPBtn.MouseButton1Click:Connect(function()
-	if selectedTarget and selectedTarget.Character and Player.Character then
+miscBtn("TP to Selected",function()
+	if selectedTarget and selectedTarget.Character then
 		Player.Character.HumanoidRootPart.CFrame =
 			selectedTarget.Character.HumanoidRootPart.CFrame * CFrame.new(0,0,-6)
 	end
 end)
 
-print("salt v2 — стабильная версия загружена")
+miscBtn("Tracking: toggle",function(btn)
+	tracking = not tracking
+	btn.BackgroundColor3 = tracking and Color3.fromRGB(0,255,128) or Color3.fromRGB(80,80,80)
+end)
+
+miscBtn("Fly: toggle",function(btn)
+	flying = not flying
+	btn.BackgroundColor3 = flying and Color3.fromRGB(0,255,128) or Color3.fromRGB(80,80,80)
+end)
+
+miscBtn("Noclip: toggle",function(btn)
+	noclip = not noclip
+	btn.BackgroundColor3 = noclip and Color3.fromRGB(0,255,128) or Color3.fromRGB(80,80,80)
+end)
+
+local scroll = Instance.new("ScrollingFrame", MiscPage)
+scroll.Size = UDim2.new(0.9,0,0.35,0)
+scroll.BackgroundColor3 = Color3.fromRGB(10,10,10)
+scroll.ScrollBarImageColor3 = Color3.fromRGB(0,255,128)
+scroll.Active = false
+scroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
