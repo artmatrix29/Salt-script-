@@ -1,54 +1,80 @@
-print("=== Grok Debug GUI Start ===")
-print("Executor: Проверяем запуск...")
+-- salt v2
 
 local success, err = pcall(function()
+    wait(2)
+    
     local Players = game:GetService("Players")
-    local Player = Players.LocalPlayer
+    local Player = Players.LocalPlayer or Players.PlayerAdded:Wait()
     
-    print("Player найден:", Player and Player.Name or "NIL!")
-    
-    local PlayerGui = Player:WaitForChild("PlayerGui", 10)
-    if not PlayerGui then
-        print("ERROR: PlayerGui не найден за 10 сек!")
-        return
-    end
-    print("PlayerGui OK")
+    local PlayerGui = Player:WaitForChild("PlayerGui", 15)
+    if not PlayerGui then return end
     
     local ScreenGui = Instance.new("ScreenGui")
-    ScreenGui.Name = "GrokDebugGUI"
+    ScreenGui.Name = "saltv2"
     ScreenGui.ResetOnSpawn = false
     ScreenGui.Enabled = true
-    ScreenGui.DisplayOrder = 999  -- самый верх
+    ScreenGui.DisplayOrder = 9999
     ScreenGui.IgnoreGuiInset = true
     ScreenGui.Parent = PlayerGui
     
-    print("ScreenGui создан и Parent = PlayerGui")
+    local MainFrame = Instance.new("Frame")
+    MainFrame.Name = "Main"
+    MainFrame.Parent = ScreenGui
+    MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 30)
+    MainFrame.BorderSizePixel = 0
+    MainFrame.Position = UDim2.new(0.5, -200, 0.5, -150)
+    MainFrame.Size = UDim2.new(0, 400, 0, 300)
+    MainFrame.Visible = true
     
-    local Frame = Instance.new("Frame")
-    Frame.Size = UDim2.new(0, 300, 0, 200)
-    Frame.Position = UDim2.new(0.5, -150, 0.5, -100)
-    Frame.BackgroundColor3 = Color3.fromRGB(30, 30, 50)
-    Frame.BorderSizePixel = 0
-    Frame.Parent = ScreenGui
+    local UICorner = Instance.new("UICorner")
+    UICorner.CornerRadius = UDim.new(0, 16)
+    UICorner.Parent = MainFrame
     
-    local Corner = Instance.new("UICorner")
-    Corner.CornerRadius = UDim.new(0, 12)
-    Corner.Parent = Frame
+    local Title = Instance.new("TextLabel")
+    Title.Parent = MainFrame
+    Title.BackgroundTransparency = 1
+    Title.Size = UDim2.new(1, 0, 0, 50)
+    Title.Font = Enum.Font.GothamBlack
+    Title.Text = "salt v2"
+    Title.TextColor3 = Color3.fromRGB(0, 255, 200)
+    Title.TextScaled = true
+    Title.TextStrokeTransparency = 0.8
     
-    local Text = Instance.new("TextLabel")
-    Text.Size = UDim2.new(1, 0, 1, 0)
-    Text.BackgroundTransparency = 1
-    Text.Text = "ТЕСТОВОЕ МЕНЮ GROK\nЕсли видишь это — GUI работает!\n\nНажми Insert для полного меню (если добавим)"
-    Text.TextColor3 = Color3.fromRGB(0, 255, 100)
-    Text.TextScaled = true
-    Text.Font = Enum.Font.GothamBold
-    Text.Parent = Frame
+    local Status = Instance.new("TextLabel")
+    Status.Parent = MainFrame
+    Status.BackgroundTransparency = 1
+    Status.Position = UDim2.new(0, 10, 0, 60)
+    Status.Size = UDim2.new(1, -20, 0, 200)
+    Status.Font = Enum.Font.SourceSansBold
+    Status.Text = "GUI загружено\n\nВыбери цель, игрушку и power\n\n(пока тестовая версия)"
+    Status.TextColor3 = Color3.fromRGB(255, 255, 255)
+    Status.TextScaled = true
+    Status.TextWrapped = true
+    Status.TextXAlignment = Enum.TextXAlignment.Left
     
-    print("Frame + Text добавлены. Должно появиться зелёное окно по центру!")
+    local Close = Instance.new("TextButton")
+    Close.Parent = MainFrame
+    Close.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
+    Close.Position = UDim2.new(1, -45, 0, 5)
+    Close.Size = UDim2.new(0, 40, 0, 40)
+    Close.Font = Enum.Font.GothamBold
+    Close.Text = "X"
+    Close.TextColor3 = Color3.fromRGB(255, 255, 255)
+    Close.TextScaled = true
+    local CloseCorner = Instance.new("UICorner", Close)
+    CloseCorner.CornerRadius = UDim.new(0, 8)
+    
+    Close.MouseButton1Click:Connect(function()
+        MainFrame.Visible = false
+    end)
+    
 end)
 
-if not success then
-    print("КРИТИЧЕСКАЯ ОШИБКА В GUI:", err)
-end
-
-print("=== Grok Debug GUI End ===")
+game:GetService("UserInputService").InputBegan:Connect(function(input)
+    if input.KeyCode == Enum.KeyCode.Insert then
+        local sg = game.Players.LocalPlayer.PlayerGui:FindFirstChild("saltv2")
+        if sg and sg:FindFirstChild("Main") then
+            sg.Main.Visible = not sg.Main.Visible
+        end
+    end
+end)
