@@ -232,52 +232,76 @@ ThrowFill.BackgroundColor3 = Color3.fromRGB(0,255,128)
 ThrowFill.Size = UDim2.new(0.5,0,1,0)
 
 -- Misc
-local PlayersScroll = Instance.new("ScrollingFrame", MiscPage)
+-- Misc Page — порядок: кнопки сверху, список игроков снизу (не перекрывает)
+
+local MiscListLayout = Instance.new("UIListLayout", MiscPage)
+MiscListLayout.Padding = UDim.new(0, 10)
+MiscListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+MiscListLayout.FillDirection = Enum.FillDirection.Vertical
+MiscListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+
+-- TPBtn
+TPBtn.LayoutOrder = 1
+TPBtn.Parent = MiscPage
+TPBtn.Size = UDim2.new(0.9,0,0,45)
+
+-- TrackBtn
+TrackBtn.LayoutOrder = 2
+TrackBtn.Parent = MiscPage
+TrackBtn.Size = UDim2.new(0.9,0,0,45)
+
+-- FlyBtn
+FlyBtn.LayoutOrder = 3
+FlyBtn.Parent = MiscPage
+FlyBtn.Size = UDim2.new(0.9,0,0,45)
+
+-- NoclipBtn
+NoclipBtn.LayoutOrder = 4
+NoclipBtn.Parent = MiscPage
+NoclipBtn.Size = UDim2.new(0.9,0,0,45)
+
+-- PlayersScroll — теперь внизу, не перекрывает
+PlayersScroll.Parent = MiscPage
+PlayersScroll.LayoutOrder = 5
+PlayersScroll.Position = UDim2.new(0,0,0,0)  -- Position не нужен с UIListLayout
+PlayersScroll.Size = UDim2.new(0.9,0,0.35,0)  -- высота меньше, чтобы уместилось
 PlayersScroll.BackgroundColor3 = Color3.fromRGB(10,10,10)
-PlayersScroll.Position = UDim2.new(0.05,0,0.05,0)
-PlayersScroll.Size = UDim2.new(0.9,0,0.35,0)
 PlayersScroll.ScrollBarImageColor3 = Color3.fromRGB(0,255,128)
 PlayersScroll.CanvasSize = UDim2.new(0,0,0,0)
+PlayersScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y  -- сам подстраивается под контент
 
-local UIListLayout = Instance.new("UIListLayout", PlayersScroll)
-UIListLayout.Padding = UDim.new(0,5)
-UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
-
-local TPBtn = Instance.new("TextButton", MiscPage)
-TPBtn.BackgroundColor3 = Color3.fromRGB(0,255,128)
-TPBtn.Position = UDim2.new(0.05,0,0.45,0)
-TPBtn.Size = UDim2.new(0.9,0,0,45)
-TPBtn.Text = "TP to Selected"
-TPBtn.TextColor3 = Color3.new(0,0,0)
-TPBtn.TextScaled = false
-TPBtn.TextSize = 18
-
-local TrackBtn = Instance.new("TextButton", MiscPage)
-TrackBtn.BackgroundColor3 = Color3.fromRGB(80,80,80)
-TrackBtn.Position = UDim2.new(0.05,0,0.57,0)
-TrackBtn.Size = UDim2.new(0.9,0,0,45)
-TrackBtn.Text = "Tracking: OFF"
-TrackBtn.TextColor3 = Color3.fromRGB(200,200,200)
-TrackBtn.TextScaled = false
-TrackBtn.TextSize = 18
-
-local FlyBtn = Instance.new("TextButton", MiscPage)
-FlyBtn.BackgroundColor3 = Color3.fromRGB(80,80,80)
-FlyBtn.Position = UDim2.new(0.05,0,0.69,0)
-FlyBtn.Size = UDim2.new(0.9,0,0,45)
-FlyBtn.Text = "Fly: OFF"
-FlyBtn.TextColor3 = Color3.fromRGB(200,200,200)
-FlyBtn.TextScaled = false
-FlyBtn.TextSize = 18
-
-local NoclipBtn = Instance.new("TextButton", MiscPage)
-NoclipBtn.BackgroundColor3 = Color3.fromRGB(80,80,80)
-NoclipBtn.Position = UDim2.new(0.05,0,0.81,0)
-NoclipBtn.Size = UDim2.new(0.9,0,0,45)
-NoclipBtn.Text = "Noclip: OFF"
-NoclipBtn.TextColor3 = Color3.fromRGB(200,200,200)
-NoclipBtn.TextScaled = false
-NoclipBtn.TextSize = 18
+-- Обновление списка игроков (остаётся то же)
+spawn(function()
+    while true do
+        wait(5)
+        for _, b in pairs(PlayersScroll:GetChildren()) do
+            if b:IsA("TextButton") then b:Destroy() end
+        end
+        local y = 0
+        for _, p in pairs(Players:GetPlayers()) do
+            if p ~= Player and p.Character then
+                local btn = Instance.new("TextButton")
+                btn.Parent = PlayersScroll
+                btn.BackgroundColor3 = (selectedTarget == p) and Color3.fromRGB(0,100,50) or Color3.fromRGB(20,20,20)
+                btn.Size = UDim2.new(1,-10,0,30)
+                btn.Text = p.Name
+                btn.TextColor3 = Color3.fromRGB(255,255,255)
+                btn.TextScaled = false
+                btn.TextSize = 18
+                btn.MouseButton1Click:Connect(function()
+                    selectedTarget = p
+                    -- подсветка
+                    for _, other in pairs(PlayersScroll:GetChildren()) do
+                        if other:IsA("TextButton") then
+                            other.BackgroundColor3 = Color3.fromRGB(20,20,20)
+                        end
+                    end
+                    btn.BackgroundColor3 = Color3.fromRGB(0,100,50)
+                end)
+            end
+        end
+    end
+end)
 
 -- Ползунки
 local draggingReach = false
